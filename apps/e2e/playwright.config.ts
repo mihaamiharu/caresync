@@ -1,4 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
+
+// Load .env from the e2e package root (Node 20.6+ built-in, no dotenv dependency needed).
+// Falls back silently when the file doesn't exist (e.g. CI sets vars directly).
+try {
+  process.loadEnvFile(path.resolve(__dirname, '.env'));
+} catch {
+  // .env not present — relying on environment variables already set
+}
 
 /**
  * See https://playwright.dev/docs/test-configuration.
