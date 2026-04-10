@@ -127,10 +127,26 @@ test.describe('User Profile Management', () => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
-    // Start the submit and immediately check the button state
-    const savePromise = profilePage.saveButton.click();
+    // Gate the PUT /users/me request so we can assert the button state mid-flight
+    let releaseRequest!: () => void;
+    const requestGate = new Promise<void>((resolve) => { releaseRequest = resolve; });
+
+    await page.route('**/api/v1/users/me', async (route) => {
+      if (route.request().method() === 'PUT') {
+        await requestGate; // hold until we've checked the button
+      }
+      await route.continue();
+    });
+
+    // Fire the click without awaiting — the route intercept will pause the request
+    profilePage.saveButton.click();
+
+    // Button must be disabled while the request is in-flight
     await expect(profilePage.saveButton).toBeDisabled();
-    await savePromise;
+
+    // Release the intercepted request and confirm the button recovers
+    releaseRequest();
+    await expect(profilePage.saveButton).toBeEnabled();
   });
 
   test('P-9: Avatar initials are shown when no avatar is set', async () => {
