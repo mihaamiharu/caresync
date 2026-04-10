@@ -90,6 +90,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      administration: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -102,6 +103,8 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload report to Pages
         uses: actions/upload-pages-artifact@v3
