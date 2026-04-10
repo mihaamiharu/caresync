@@ -44,6 +44,22 @@ Base URL: `http://localhost:5173` (web) + `http://localhost:3000` (api)
 | N-2 | Root redirect unauthenticated | Navigate to `/` without login | Redirected to `/login` |
 | N-3 | Sidebar renders after login | Login → check sidebar | Sidebar visible with navigation items |
 
+## User Profile Management
+
+| # | Scenario | Steps | Expected |
+|---|----------|-------|----------|
+| P-1 | Navigate to profile page via sidebar | Login → click Profile nav | On `/profile`, heading visible |
+| P-2 | Form pre-filled with current user data | Login → go to `/profile` | firstName/lastName inputs show registered values |
+| P-3 | Email shown as read-only | Login → go to `/profile` | Email text visible; no editable email input |
+| P-4 | Successful profile update | Update name → save | Success message shown |
+| P-5 | Updated name persists across navigation | Update name → navigate away → return | New name pre-filled in form |
+| P-6 | Validation: empty first name | Clear firstName → save | Inline error shown |
+| P-7 | Validation: empty last name | Clear lastName → save | Inline error shown |
+| P-8 | Save button disabled while submitting | Click save | Button disabled during request |
+| P-9 | Avatar initials shown when no avatar | Login → go to `/profile` | Initials element shows first+last initial |
+| P-10 | Avatar upload replaces initials with image | Upload image file | Avatar `<img>` replaces initials |
+| P-11 | Phone update persists | Update phone → save → reload | Phone field retains new value |
+
 ---
 
 ## Priority Order
@@ -71,3 +87,4 @@ Implement in this order — happy paths first, then guards, then edge cases:
 | `tests/auth-register.spec.ts` | R-1 through R-6 |
 | `tests/auth-session.spec.ts` | S-1 through S-5 |
 | `tests/navigation.spec.ts` | N-1 through N-3 |
+| `tests/profile.spec.ts` | P-1 through P-11, A-1, A-2 |
