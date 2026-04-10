@@ -9,6 +9,7 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from "../lib/jwt";
+import { env } from "../lib/env";
 import type { AppEnv } from "../app";
 
 export const authRoute = new OpenAPIHono<AppEnv>();
@@ -60,6 +61,10 @@ const registerRoute = createRoute({
       description: "Account created",
       content: { "application/json": { schema: authResponse } },
     },
+    400: {
+      description: "Validation error",
+      content: { "application/json": { schema: errorResponse } },
+    },
     409: {
       description: "Email already taken",
       content: { "application/json": { schema: errorResponse } },
@@ -102,7 +107,7 @@ authRoute.openapi(registerRoute, async (c) => {
 
   setCookie(c, "refreshToken", refreshToken, {
     httpOnly: true,
-    secure: false,
+    secure: env.IS_PRODUCTION,
     sameSite: "Lax",
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
@@ -136,6 +141,10 @@ const loginRoute = createRoute({
     200: {
       description: "Login successful",
       content: { "application/json": { schema: authResponse } },
+    },
+    400: {
+      description: "Validation error",
+      content: { "application/json": { schema: errorResponse } },
     },
     401: {
       description: "Invalid credentials",
@@ -171,7 +180,7 @@ authRoute.openapi(loginRoute, async (c) => {
 
   setCookie(c, "refreshToken", refreshToken, {
     httpOnly: true,
-    secure: false,
+    secure: env.IS_PRODUCTION,
     sameSite: "Lax",
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
@@ -222,10 +231,18 @@ authRoute.openapi(refreshRoute, async (c) => {
 
   try {
     const payload = verifyRefreshToken(refreshToken);
-    const accessToken = signAccessToken({
-      userId: payload.userId,
-      role: payload.role,
-    });
+
+    const [user] = await db
+      .select({ id: users.id, role: users.role, isActive: users.isActive })
+      .from(users)
+      .where(eq(users.id, payload.userId))
+      .limit(1);
+
+    if (!user || !user.isActive) {
+      return c.json({ message: "Invalid refresh token" }, 401);
+    }
+
+    const accessToken = signAccessToken({ userId: user.id, role: user.role });
     return c.json({ accessToken }, 200);
   } catch {
     return c.json({ message: "Invalid refresh token" }, 401);
