@@ -40,7 +40,7 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4" data-testid="register-page">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold">CareSync</h1>
@@ -49,7 +49,7 @@ export function RegisterPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           {serverError && (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p role="alert" data-testid="register-error" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {serverError}
             </p>
           )}
@@ -65,11 +65,12 @@ export function RegisterPage() {
               id="firstName"
               type="text"
               autoComplete="given-name"
+              data-testid="firstName-input"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               {...register("firstName")}
             />
             {errors.firstName && (
-              <p className="text-xs text-destructive">{errors.firstName.message}</p>
+              <p className="text-xs text-destructive" data-testid="firstName-error">{errors.firstName.message}</p>
             )}
           </div>
 
@@ -81,11 +82,12 @@ export function RegisterPage() {
               id="lastName"
               type="text"
               autoComplete="family-name"
+              data-testid="lastName-input"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               {...register("lastName")}
             />
             {errors.lastName && (
-              <p className="text-xs text-destructive">{errors.lastName.message}</p>
+              <p className="text-xs text-destructive" data-testid="lastName-error">{errors.lastName.message}</p>
             )}
           </div>
 
@@ -97,11 +99,12 @@ export function RegisterPage() {
               id="email"
               type="email"
               autoComplete="email"
+              data-testid="email-input"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               {...register("email")}
             />
             {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
+              <p className="text-xs text-destructive" data-testid="email-error">{errors.email.message}</p>
             )}
           </div>
 
@@ -113,17 +116,19 @@ export function RegisterPage() {
               id="password"
               type="password"
               autoComplete="new-password"
+              data-testid="password-input"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               {...register("password")}
             />
             {errors.password && (
-              <p className="text-xs text-destructive">{errors.password.message}</p>
+              <p className="text-xs text-destructive" data-testid="password-error">{errors.password.message}</p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
+            data-testid="register-submit"
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             Create account
@@ -132,7 +137,7 @@ export function RegisterPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link to="/login" className="font-medium text-primary hover:underline">
+          <Link to="/login" data-testid="login-link" className="font-medium text-primary hover:underline">
             Sign in
           </Link>
         </p>

@@ -3,7 +3,7 @@ import { app } from "./app";
 
 const port = Number(process.env.PORT || 3000);
 
-console.log(`🏥 MediBook API running on http://localhost:${port}`);
+console.log(`🏥 caresync API running on http://localhost:${port}`);
 console.log(`📖 API Docs: http://localhost:${port}/api/docs`);
 
 serve({ fetch: app.fetch, port });
