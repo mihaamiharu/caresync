@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { healthRoute } from "./routes/health";
 import { authRoute } from "./routes/auth";
+import { usersRoute } from "./routes/users";
 
 export type AppEnv = {
   Variables: {
@@ -32,6 +33,7 @@ app.get("/health", (c) =>
 // Routes
 app.route("/api/v1", healthRoute);
 app.route("/api/v1", authRoute);
+app.route("/api/v1", usersRoute);
 
 // OpenAPI spec
 app.doc("/api/openapi.json", {
