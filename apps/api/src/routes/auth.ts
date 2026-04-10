@@ -177,16 +177,19 @@ authRoute.openapi(loginRoute, async (c) => {
     path: "/",
   });
 
-  return c.json({
-    accessToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      firstName: user.firstName,
-      lastName: user.lastName,
+  return c.json(
+    {
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
     },
-  });
+    200
+  );
 });
 
 // Refresh
@@ -223,7 +226,7 @@ authRoute.openapi(refreshRoute, async (c) => {
       userId: payload.userId,
       role: payload.role,
     });
-    return c.json({ accessToken });
+    return c.json({ accessToken }, 200);
   } catch {
     return c.json({ message: "Invalid refresh token" }, 401);
   }
