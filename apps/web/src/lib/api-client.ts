@@ -1,6 +1,5 @@
 import axios from "axios";
-import type { LoginInput, RegisterInput } from "@caresync/shared";
-import type { User } from "@caresync/shared";
+import type { LoginInput, RegisterInput, PaginatedResponse, User } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
 export const apiClient = axios.create({
@@ -65,5 +64,46 @@ export const authApi = {
 
   logout: async (): Promise<void> => {
     await apiClient.post("/api/v1/auth/logout");
+  },
+};
+
+interface UpdateProfileInput {
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+}
+
+interface ListUsersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export const usersApi = {
+  getProfile: async (): Promise<User> => {
+    const res = await apiClient.get<User>("/api/v1/users/me");
+    return res.data;
+  },
+
+  updateProfile: async (data: UpdateProfileInput): Promise<User> => {
+    const res = await apiClient.put<User>("/api/v1/users/me", data);
+    return res.data;
+  },
+
+  updateAvatar: async (formData: FormData): Promise<User> => {
+    const res = await apiClient.put<User>("/api/v1/users/me/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
+
+  listUsers: async (params?: ListUsersParams): Promise<PaginatedResponse<User>> => {
+    const res = await apiClient.get<PaginatedResponse<User>>("/api/v1/users", { params });
+    return res.data;
+  },
+
+  updateUserStatus: async (id: string, isActive: boolean): Promise<User> => {
+    const res = await apiClient.patch<User>(`/api/v1/users/${id}/status`, { isActive });
+    return res.data;
   },
 };
