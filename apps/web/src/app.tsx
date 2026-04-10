@@ -4,6 +4,7 @@ import { DashboardPage } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
 import { RegisterPage } from "@/pages/register";
 import { ProfilePage } from "@/pages/profile";
+import { DepartmentsPage } from "@/pages/departments";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 
 export function App() {
@@ -16,6 +17,7 @@ export function App() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/departments" element={<DepartmentsPage />} />
           {/* Additional routes will be added per task */}
         </Route>
       </Route>
