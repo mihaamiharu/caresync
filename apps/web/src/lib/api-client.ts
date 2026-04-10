@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { LoginInput, RegisterInput, PaginatedResponse, User } from "@caresync/shared";
+import type { LoginInput, RegisterInput, PaginatedResponse, User, Department } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
 export const apiClient = axios.create({
@@ -105,5 +105,44 @@ export const usersApi = {
   updateUserStatus: async (id: string, isActive: boolean): Promise<User> => {
     const res = await apiClient.patch<User>(`/api/v1/users/${id}/status`, { isActive });
     return res.data;
+  },
+};
+
+interface DepartmentInput {
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  isActive?: boolean;
+}
+
+interface ListDepartmentsParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export const departmentsApi = {
+  listDepartments: async (params?: ListDepartmentsParams): Promise<PaginatedResponse<Department>> => {
+    const res = await apiClient.get<PaginatedResponse<Department>>("/api/v1/departments", { params });
+    return res.data;
+  },
+
+  getDepartment: async (id: string): Promise<Department> => {
+    const res = await apiClient.get<Department>(`/api/v1/departments/${id}`);
+    return res.data;
+  },
+
+  createDepartment: async (data: DepartmentInput): Promise<Department> => {
+    const res = await apiClient.post<Department>("/api/v1/departments", data);
+    return res.data;
+  },
+
+  updateDepartment: async (id: string, data: DepartmentInput): Promise<Department> => {
+    const res = await apiClient.put<Department>(`/api/v1/departments/${id}`, data);
+    return res.data;
+  },
+
+  deleteDepartment: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/v1/departments/${id}`);
   },
 };
