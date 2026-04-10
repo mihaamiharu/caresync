@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import { loginSchema, type LoginInput } from "@caresync/shared";
 import { authApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth-store";
 export function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -18,6 +19,10 @@ export function LoginPage() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const onSubmit = async (data: LoginInput) => {
     setServerError(null);

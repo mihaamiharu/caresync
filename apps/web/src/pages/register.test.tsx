@@ -141,4 +141,13 @@ describe("RegisterPage", () => {
     renderRegister();
     expect(screen.getByRole("link", { name: /sign in|log in|login/i })).toBeInTheDocument();
   });
+
+  it("redirects to /dashboard when already authenticated", () => {
+    useAuthStore.setState({
+      user: { id: "u1", email: "p@test.com", role: "patient", firstName: "John", lastName: "Doe", phone: null, avatarUrl: null, isActive: true, createdAt: "", updatedAt: "" },
+      accessToken: "existing-token",
+    });
+    renderRegister();
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+  });
 });

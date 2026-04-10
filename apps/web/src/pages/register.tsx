@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import { registerSchema, type RegisterInput } from "@caresync/shared";
 import { authApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth-store";
 export function RegisterPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -19,6 +20,10 @@ export function RegisterPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: { role: "patient" },
   });
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const onSubmit = async (data: RegisterInput) => {
     setServerError(null);
