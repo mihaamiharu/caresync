@@ -23,6 +23,11 @@ app.use(
   })
 );
 
+// Root health check (for load balancers and Task 2 acceptance criteria)
+app.get("/health", (c) =>
+  c.json({ status: "ok", timestamp: new Date().toISOString() })
+);
+
 // Routes
 app.route("/api/v1", healthRoute);
 
