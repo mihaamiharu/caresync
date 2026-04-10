@@ -22,12 +22,12 @@ app.use(
   cors({
     origin: ["http://localhost:5173"],
     credentials: true,
-  })
+  }),
 );
 
 // Root health check (for load balancers and Task 2 acceptance criteria)
 app.get("/health", (c) =>
-  c.json({ status: "ok", timestamp: new Date().toISOString() })
+  c.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
 
 // Routes
@@ -39,7 +39,7 @@ app.route("/api/v1", usersRoute);
 app.doc("/api/openapi.json", {
   openapi: "3.1.0",
   info: {
-    title: "MediBook API",
+    title: "caresync API",
     version: "1.0.0",
     description:
       "Healthcare Clinic Management System API — a practice ground for QA Automation Engineers",
@@ -52,5 +52,5 @@ app.get(
   apiReference({
     spec: { url: "/api/openapi.json" },
     theme: "kepler",
-  })
+  }),
 );

@@ -9,8 +9,12 @@ import {
   Bell,
   Settings,
   HeartPulse,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
+import { authApi } from "@/lib/api-client";
+import { useNavigate } from "react-router";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -24,6 +28,20 @@ const navItems = [
 ];
 
 export function Sidebar() {
+  const navigate = useNavigate();
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (err) {
+      // Ignore API errors on logout
+    } finally {
+      clearAuth();
+      navigate("/login", { replace: true });
+    }
+  };
+
   return (
     <aside
       className="flex h-screen w-64 flex-col border-r border-border bg-sidebar"
@@ -59,6 +77,17 @@ export function Sidebar() {
           ))}
         </ul>
       </nav>
+
+      <div className="border-t border-border p-4">
+        <button
+          onClick={handleLogout}
+          data-testid="logout-button"
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          Log out
+        </button>
+      </div>
     </aside>
   );
 }

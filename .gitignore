@@ -5,3 +5,10 @@ dist
 .env.local
 *.log
 uploads/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.playwright-cli/
