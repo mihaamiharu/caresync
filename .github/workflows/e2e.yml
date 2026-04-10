@@ -63,6 +63,9 @@ jobs:
 
     - name: Run Playwright tests
       run: pnpm test:e2e
+      env:
+        ADMIN_EMAIL: admin@caresync.dev
+        ADMIN_PASSWORD: Password123!
 
     - uses: actions/upload-artifact@v6
       if: always()
