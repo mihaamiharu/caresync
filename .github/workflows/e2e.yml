@@ -4,6 +4,8 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   test:
     timeout-minutes: 60
@@ -57,11 +59,11 @@ jobs:
 
     - name: Install Playwright Browsers
       if: steps.playwright-cache.outputs.cache-hit != 'true'
-      run: pnpm exec playwright install --with-deps chromium
-      
+      run: pnpm --filter @caresync/e2e exec playwright install --with-deps chromium
+
     - name: Install Playwright OS Dependencies
       if: steps.playwright-cache.outputs.cache-hit == 'true'
-      run: pnpm exec playwright install-deps chromium
+      run: pnpm --filter @caresync/e2e exec playwright install-deps chromium
       
     - name: Run Playwright tests
       run: pnpm test:e2e
