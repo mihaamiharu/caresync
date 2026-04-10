@@ -6,6 +6,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { healthRoute } from "./routes/health";
 import { authRoute } from "./routes/auth";
 import { usersRoute } from "./routes/users";
+import { departmentsRoute } from "./routes/departments";
 
 export type AppEnv = {
   Variables: {
@@ -38,6 +39,7 @@ app.get("/health", (c) =>
 app.route("/api/v1", healthRoute);
 app.route("/api/v1", authRoute);
 app.route("/api/v1", usersRoute);
+app.route("/api/v1", departmentsRoute);
 
 // OpenAPI spec
 app.doc("/api/openapi.json", {

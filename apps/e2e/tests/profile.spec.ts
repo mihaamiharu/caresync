@@ -197,15 +197,56 @@ test.describe('User Profile Management', () => {
 });
 
 test.describe('User Profile — API (admin operations)', () => {
-  // Note: admin user creation via registration is not supported (role is fixed to "patient").
-  // These tests verify the API contract directly using a seeded admin account.
-  // They are marked as skipped until a seed/fixture is available.
-
   test('A-1: Admin can list all users via GET /users', async ({ request }) => {
-    test.skip(true, 'Requires seeded admin credentials — covered by unit tests');
+    test.skip(!config.adminEmail, 'Set ADMIN_EMAIL + ADMIN_PASSWORD env vars or run Task 24 seed');
+
+    const loginRes = await request.post(`${config.apiUrl}/api/v1/auth/login`, {
+      data: { email: config.adminEmail, password: config.adminPassword },
+    });
+    const { accessToken } = await loginRes.json();
+
+    const res = await request.get(`${config.apiUrl}/api/v1/users`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      data: expect.any(Array),
+      total: expect.any(Number),
+      page: expect.any(Number),
+      limit: expect.any(Number),
+      totalPages: expect.any(Number),
+    });
   });
 
   test('A-2: Admin can deactivate a user via PATCH /users/:id/status', async ({ request }) => {
-    test.skip(true, 'Requires seeded admin credentials — covered by unit tests');
+    test.skip(!config.adminEmail, 'Set ADMIN_EMAIL + ADMIN_PASSWORD env vars or run Task 24 seed');
+
+    // Register a fresh patient to deactivate
+    const regRes = await request.post(`${config.apiUrl}/api/v1/auth/register`, {
+      data: {
+        role: 'patient',
+        firstName: faker.person.firstName(),
+        lastName: faker.person.lastName(),
+        email: faker.internet.email().toLowerCase(),
+        password: faker.internet.password({ length: 12 }) + 'A!',
+      },
+    });
+    const { user } = await regRes.json();
+
+    const loginRes = await request.post(`${config.apiUrl}/api/v1/auth/login`, {
+      data: { email: config.adminEmail, password: config.adminPassword },
+    });
+    const { accessToken } = await loginRes.json();
+
+    const res = await request.patch(`${config.apiUrl}/api/v1/users/${user.id}/status`, {
+      data: { isActive: false },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.isActive).toBe(false);
   });
 });
