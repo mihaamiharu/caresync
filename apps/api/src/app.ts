@@ -2,6 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { apiReference } from "@scalar/hono-api-reference";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { healthRoute } from "./routes/health";
 import { authRoute } from "./routes/auth";
 import { usersRoute } from "./routes/users";
@@ -24,6 +25,9 @@ app.use(
     credentials: true,
   }),
 );
+
+// Serve uploaded files
+app.use("/uploads/*", serveStatic({ root: "./" }));
 
 // Root health check (for load balancers and Task 2 acceptance criteria)
 app.get("/health", (c) =>

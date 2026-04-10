@@ -8,6 +8,7 @@ import {
   Receipt,
   Bell,
   Settings,
+  User,
   HeartPulse,
   LogOut,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const navItems = [
   { to: "/medical-records", label: "Medical Records", icon: FileText },
   { to: "/invoices", label: "Invoices", icon: Receipt },
   { to: "/notifications", label: "Notifications", icon: Bell },
+  { to: "/profile", label: "Profile", icon: User },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
