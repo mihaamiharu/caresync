@@ -1,12 +1,8 @@
-import { test, expect } from '@playwright/test';
-import { faker } from '@faker-js/faker';
-import { LoginPage } from './poms/LoginPage';
-import { ProfilePage } from './poms/ProfilePage';
-import { config } from './utils/config';
+import { test, expect } from "./utils/test-base";
+import { faker } from "@faker-js/faker";
+import { config } from "./utils/config";
 
-test.describe('User Profile Management', () => {
-  let loginPage: LoginPage;
-  let profilePage: ProfilePage;
+test.describe("User Profile Management", () => {
   let testUser: {
     email: string;
     password: string;
@@ -15,43 +11,52 @@ test.describe('User Profile Management', () => {
     phone: string;
   };
 
-  test.beforeEach(async ({ page, request }) => {
-    loginPage = new LoginPage(page);
-    profilePage = new ProfilePage(page);
-
+  test.beforeEach(async ({ page, request, loginPage, cleanup }) => {
     testUser = {
       email: faker.internet.email().toLowerCase(),
-      password: faker.internet.password({ length: 12 }) + 'A!',
+      password: faker.internet.password({ length: 12 }) + "A!",
       firstName: faker.person.firstName(),
       lastName: faker.person.lastName(),
       phone: faker.phone.number(),
     };
 
-    const response = await request.post(`${config.apiUrl}/api/v1/auth/register`, {
-      data: {
-        role: 'patient',
-        firstName: testUser.firstName,
-        lastName: testUser.lastName,
-        email: testUser.email,
-        password: testUser.password,
-      },
-    });
+    const response = await request.post(
+      `${config.apiUrl}/api/v1/auth/register`,
+      {
+        data: {
+          role: "patient",
+          firstName: testUser.firstName,
+          lastName: testUser.lastName,
+          email: testUser.email,
+          password: testUser.password,
+        },
+      }
+    );
     expect(response.ok()).toBeTruthy();
+    const newUser = await response.json();
+    cleanup.addUser(newUser.id);
 
     // Login and navigate to profile
     await loginPage.goto();
     await loginPage.login(testUser.email, testUser.password);
-    await page.waitForURL('/dashboard');
+    await page.waitForURL("/dashboard");
   });
 
-  test('P-1: Navigate to profile page via sidebar', async ({ page }) => {
-    await page.getByTestId('nav-profile').click();
-    await page.waitForURL('/profile');
+  test("P-1: Navigate to profile page via sidebar", async ({
+    page,
+    profilePage,
+  }) => {
+    await page.getByTestId("nav-profile").click();
+    await page.waitForURL("/profile");
     await profilePage.isLoaded();
-    await expect(page.getByRole('heading', { name: /^profile$/i, level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /^profile$/i, level: 1 })
+    ).toBeVisible();
   });
 
-  test('P-2: Profile form is pre-filled with current user data', async () => {
+  test("P-2: Profile form is pre-filled with current user data", async ({
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
@@ -59,7 +64,10 @@ test.describe('User Profile Management', () => {
     await expect(profilePage.lastNameInput).toHaveValue(testUser.lastName);
   });
 
-  test('P-3: Email is shown as read-only (not in an input field)', async ({ page }) => {
+  test("P-3: Email is shown as read-only (not in an input field)", async ({
+    page,
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
@@ -69,7 +77,9 @@ test.describe('User Profile Management', () => {
     await expect(emailInput).toHaveCount(0);
   });
 
-  test('P-4: Successful profile update shows success message', async ({ page }) => {
+  test("P-4: Successful profile update shows success message", async ({
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
@@ -79,10 +89,15 @@ test.describe('User Profile Management', () => {
     await profilePage.updateProfile(newFirstName, newLastName, testUser.phone);
 
     await expect(profilePage.successMessage).toBeVisible();
-    await expect(profilePage.successMessage).toContainText(/updated successfully/i);
+    await expect(profilePage.successMessage).toContainText(
+      /updated successfully/i
+    );
   });
 
-  test('P-5: Updated name persists after navigating away and back', async ({ page }) => {
+  test("P-5: Updated name persists after navigating away and back", async ({
+    page,
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
@@ -93,15 +108,17 @@ test.describe('User Profile Management', () => {
     await expect(profilePage.successMessage).toBeVisible();
 
     // Navigate away and return
-    await page.goto('/dashboard');
-    await page.goto('/profile');
+    await page.goto("/dashboard");
+    await page.goto("/profile");
     await profilePage.isLoaded();
 
     await expect(profilePage.firstNameInput).toHaveValue(newFirstName);
     await expect(profilePage.lastNameInput).toHaveValue(newLastName);
   });
 
-  test('P-6: Validation error shown when first name is cleared', async () => {
+  test("P-6: Validation error shown when first name is cleared", async ({
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
@@ -112,7 +129,9 @@ test.describe('User Profile Management', () => {
     await expect(profilePage.firstNameError).toContainText(/required/i);
   });
 
-  test('P-7: Validation error shown when last name is cleared', async () => {
+  test("P-7: Validation error shown when last name is cleared", async ({
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
@@ -123,16 +142,21 @@ test.describe('User Profile Management', () => {
     await expect(profilePage.lastNameError).toContainText(/required/i);
   });
 
-  test('P-8: Save button is disabled while submitting', async ({ page }) => {
+  test("P-8: Save button is disabled while submitting", async ({
+    page,
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
     // Gate the PUT /users/me request so we can assert the button state mid-flight
     let releaseRequest!: () => void;
-    const requestGate = new Promise<void>((resolve) => { releaseRequest = resolve; });
+    const requestGate = new Promise<void>((resolve) => {
+      releaseRequest = resolve;
+    });
 
-    await page.route('**/api/v1/users/me', async (route) => {
-      if (route.request().method() === 'PUT') {
+    await page.route("**/api/v1/users/me", async (route) => {
+      if (route.request().method() === "PUT") {
         await requestGate; // hold until we've checked the button
       }
       await route.continue();
@@ -149,7 +173,9 @@ test.describe('User Profile Management', () => {
     await expect(profilePage.saveButton).toBeEnabled();
   });
 
-  test('P-9: Avatar initials are shown when no avatar is set', async () => {
+  test("P-9: Avatar initials are shown when no avatar is set", async ({
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
@@ -159,34 +185,47 @@ test.describe('User Profile Management', () => {
     await expect(profilePage.avatarInitials).toContainText(initials);
   });
 
-  test('P-10: Avatar upload replaces initials with image', async ({ page }) => {
+  test("P-10: Avatar upload replaces initials with image", async ({
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
     // Create a minimal valid JPEG buffer (1x1 pixel)
     const minimalJpeg = Buffer.from(
-      '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8U' +
-      'HRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgN' +
-      'DRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy' +
-      'MjL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAA' +
-      'AAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/' +
-      'aAAwDAQACEQMRAD8AJQAB/9k=',
-      'base64'
+      "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8U" +
+        "HRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgN" +
+        "DRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy" +
+        "MjL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAA" +
+        "AAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/" +
+        "aAAwDAQACEQMRAD8AJQAB/9k=",
+      "base64"
     );
 
-    await profilePage.uploadAvatar(minimalJpeg, 'test-avatar.jpg', 'image/jpeg');
+    await profilePage.uploadAvatar(
+      minimalJpeg,
+      "test-avatar.jpg",
+      "image/jpeg"
+    );
 
     // After upload the avatar image element should appear (replacing initials)
     await expect(profilePage.avatarImage).toBeVisible({ timeout: 10_000 });
     await expect(profilePage.avatarInitials).not.toBeVisible();
   });
 
-  test('P-11: Phone number can be updated and is saved', async ({ page }) => {
+  test("P-11: Phone number can be updated and is saved", async ({
+    page,
+    profilePage,
+  }) => {
     await profilePage.goto();
     await profilePage.isLoaded();
 
-    const newPhone = '+19995551234';
-    await profilePage.updateProfile(testUser.firstName, testUser.lastName, newPhone);
+    const newPhone = "+19995551234";
+    await profilePage.updateProfile(
+      testUser.firstName,
+      testUser.lastName,
+      newPhone
+    );
     await expect(profilePage.successMessage).toBeVisible();
 
     // Reload to confirm persistence
@@ -196,9 +235,15 @@ test.describe('User Profile Management', () => {
   });
 });
 
-test.describe('User Profile — API (admin operations)', () => {
-  test('A-1: Admin can list all users via GET /users', async ({ request }) => {
-    test.skip(!config.adminEmail, 'Set ADMIN_EMAIL + ADMIN_PASSWORD env vars or run Task 24 seed');
+test.describe("User Profile — API (admin operations)", () => {
+  test("A-1: Admin can list all users via GET /users", async ({
+    request,
+    cleanup,
+  }) => {
+    test.skip(
+      !config.adminEmail,
+      "Set ADMIN_EMAIL + ADMIN_PASSWORD env vars or run Task 24 seed"
+    );
 
     const loginRes = await request.post(`${config.apiUrl}/api/v1/auth/login`, {
       data: { email: config.adminEmail, password: config.adminPassword },
@@ -220,30 +265,41 @@ test.describe('User Profile — API (admin operations)', () => {
     });
   });
 
-  test('A-2: Admin can deactivate a user via PATCH /users/:id/status', async ({ request }) => {
-    test.skip(!config.adminEmail, 'Set ADMIN_EMAIL + ADMIN_PASSWORD env vars or run Task 24 seed');
+  test("A-2: Admin can deactivate a user via PATCH /users/:id/status", async ({
+    request,
+    cleanup,
+  }) => {
+    test.skip(
+      !config.adminEmail,
+      "Set ADMIN_EMAIL + ADMIN_PASSWORD env vars or run Task 24 seed"
+    );
 
     // Register a fresh patient to deactivate
     const regRes = await request.post(`${config.apiUrl}/api/v1/auth/register`, {
       data: {
-        role: 'patient',
+        role: "patient",
         firstName: faker.person.firstName(),
         lastName: faker.person.lastName(),
         email: faker.internet.email().toLowerCase(),
-        password: faker.internet.password({ length: 12 }) + 'A!',
+        password: faker.internet.password({ length: 12 }) + "A!",
       },
     });
     const { user } = await regRes.json();
+    // Track for cleanup if the patch fails for some reason
+    cleanup.addUser(user.id);
 
     const loginRes = await request.post(`${config.apiUrl}/api/v1/auth/login`, {
       data: { email: config.adminEmail, password: config.adminPassword },
     });
     const { accessToken } = await loginRes.json();
 
-    const res = await request.patch(`${config.apiUrl}/api/v1/users/${user.id}/status`, {
-      data: { isActive: false },
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const res = await request.patch(
+      `${config.apiUrl}/api/v1/users/${user.id}/status`,
+      {
+        data: { isActive: false },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
 
     expect(res.status()).toBe(200);
     const body = await res.json();

@@ -1,5 +1,12 @@
 import axios from "axios";
-import type { LoginInput, RegisterInput, PaginatedResponse, User, Department } from "@caresync/shared";
+import type {
+  LoginInput,
+  RegisterInput,
+  PaginatedResponse,
+  User,
+  Department,
+  Doctor,
+} from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
 export const apiClient = axios.create({
@@ -58,7 +65,10 @@ export const authApi = {
   },
 
   register: async (data: RegisterInput): Promise<AuthResponse> => {
-    const res = await apiClient.post<AuthResponse>("/api/v1/auth/register", data);
+    const res = await apiClient.post<AuthResponse>(
+      "/api/v1/auth/register",
+      data
+    );
     return res.data;
   },
 
@@ -97,13 +107,19 @@ export const usersApi = {
     return res.data;
   },
 
-  listUsers: async (params?: ListUsersParams): Promise<PaginatedResponse<User>> => {
-    const res = await apiClient.get<PaginatedResponse<User>>("/api/v1/users", { params });
+  listUsers: async (
+    params?: ListUsersParams
+  ): Promise<PaginatedResponse<User>> => {
+    const res = await apiClient.get<PaginatedResponse<User>>("/api/v1/users", {
+      params,
+    });
     return res.data;
   },
 
   updateUserStatus: async (id: string, isActive: boolean): Promise<User> => {
-    const res = await apiClient.patch<User>(`/api/v1/users/${id}/status`, { isActive });
+    const res = await apiClient.patch<User>(`/api/v1/users/${id}/status`, {
+      isActive,
+    });
     return res.data;
   },
 };
@@ -122,8 +138,13 @@ interface ListDepartmentsParams {
 }
 
 export const departmentsApi = {
-  listDepartments: async (params?: ListDepartmentsParams): Promise<PaginatedResponse<Department>> => {
-    const res = await apiClient.get<PaginatedResponse<Department>>("/api/v1/departments", { params });
+  listDepartments: async (
+    params?: ListDepartmentsParams
+  ): Promise<PaginatedResponse<Department>> => {
+    const res = await apiClient.get<PaginatedResponse<Department>>(
+      "/api/v1/departments",
+      { params }
+    );
     return res.data;
   },
 
@@ -137,12 +158,80 @@ export const departmentsApi = {
     return res.data;
   },
 
-  updateDepartment: async (id: string, data: DepartmentInput): Promise<Department> => {
-    const res = await apiClient.put<Department>(`/api/v1/departments/${id}`, data);
+  updateDepartment: async (
+    id: string,
+    data: DepartmentInput
+  ): Promise<Department> => {
+    const res = await apiClient.put<Department>(
+      `/api/v1/departments/${id}`,
+      data
+    );
     return res.data;
   },
 
   deleteDepartment: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/v1/departments/${id}`);
+  },
+};
+
+interface CreateDoctorInput {
+  email: string;
+  password?: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  departmentId: string;
+  specialization: string;
+  bio?: string | null;
+  licenseNumber: string;
+}
+
+interface UpdateDoctorInput {
+  firstName?: string;
+  lastName?: string;
+  phone?: string | null;
+  departmentId?: string;
+  specialization?: string;
+  bio?: string | null;
+}
+
+interface ListDoctorsParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  departmentId?: string;
+}
+
+export const doctorsApi = {
+  listDoctors: async (
+    params?: ListDoctorsParams
+  ): Promise<PaginatedResponse<Doctor>> => {
+    const res = await apiClient.get<PaginatedResponse<Doctor>>(
+      "/api/v1/doctors",
+      { params }
+    );
+    return res.data;
+  },
+
+  getDoctor: async (id: string): Promise<Doctor> => {
+    const res = await apiClient.get<Doctor>(`/api/v1/doctors/${id}`);
+    return res.data;
+  },
+
+  createDoctor: async (data: CreateDoctorInput): Promise<Doctor> => {
+    const res = await apiClient.post<Doctor>("/api/v1/doctors", data);
+    return res.data;
+  },
+
+  updateDoctor: async (
+    id: string,
+    data: UpdateDoctorInput
+  ): Promise<Doctor> => {
+    const res = await apiClient.put<Doctor>(`/api/v1/doctors/${id}`, data);
+    return res.data;
+  },
+
+  deleteDoctor: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/v1/doctors/${id}`);
   },
 };
