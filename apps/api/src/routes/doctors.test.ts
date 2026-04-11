@@ -44,9 +44,11 @@ const mockDoctor = {
 function makeSelectChain(result: unknown[]) {
   const limit = vi.fn().mockResolvedValue(result);
   const where = vi.fn().mockReturnValue({ limit });
-  const innerJoin = vi
-    .fn()
-    .mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where, limit }), where, limit });
+  const innerJoin = vi.fn().mockReturnValue({
+    innerJoin: vi.fn().mockReturnValue({ where, limit }),
+    where,
+    limit,
+  });
   const from = vi.fn().mockReturnValue({ innerJoin, where, limit });
   return { from };
 }
@@ -82,6 +84,17 @@ function makeUpdateChain(result: unknown[]) {
   const where = vi.fn().mockReturnValue({ returning });
   const set = vi.fn().mockReturnValue({ where });
   return { set };
+}
+
+function makeSimpleSelectChain(result: unknown[]) {
+  const where = vi.fn().mockResolvedValue(result);
+  const from = vi.fn().mockReturnValue({ where });
+  return { from };
+}
+
+function makeDeleteChain() {
+  const where = vi.fn().mockResolvedValue([]);
+  return { where };
 }
 
 function bearer(token: string) {
@@ -232,7 +245,9 @@ describe("PUT /doctors/:id", () => {
   });
 
   it("returns 403 if not admin and not the same doctor", async () => {
-    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([mockDoctor]) as any);
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeSelectChain([mockDoctor]) as any
+    );
 
     const token = signAccessToken({
       userId: "00000000-0000-0000-0000-000000000888",
@@ -251,7 +266,9 @@ describe("PUT /doctors/:id", () => {
   });
 
   it("returns 200 and updates for admin", async () => {
-    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([mockDoctor]) as any);
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeSelectChain([mockDoctor]) as any
+    );
     vi.mocked(db.update).mockReturnValueOnce(makeUpdateChain([]) as any); // user update
     vi.mocked(db.update).mockReturnValueOnce(
       makeUpdateChain([{ ...mockDoctor, specialization: "Updated" }]) as any
@@ -283,15 +300,11 @@ describe("PUT /doctors/:id", () => {
 
   it("does NOT update specialization if requester is NOT admin", async () => {
     vi.mocked(db.select).mockReturnValueOnce({
-      from: vi
-        .fn()
-        .mockReturnValue({
-          where: vi
-            .fn()
-            .mockReturnValue({
-              limit: vi.fn().mockResolvedValue([mockDoctor]),
-            }),
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([mockDoctor]),
         }),
+      }),
     } as any);
     vi.mocked(db.update).mockReturnValueOnce(makeUpdateChain([]) as any); // user update
     vi.mocked(db.update).mockReturnValueOnce(
@@ -341,15 +354,15 @@ describe("DELETE /doctors/:id", () => {
     expect(body.message).toMatch(/appointments/i);
   });
 
-  it("returns 200 and deactivates user (soft delete) if no records", async () => {
+  it("returns 200 and hard-deletes doctor and user if no records", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
       .mockReturnValueOnce(makeSelectChain([]) as any) // no appointments
-      .mockReturnValueOnce(makeSelectChain([]) as any); // no records
+      .mockReturnValueOnce(makeSelectChain([]) as any); // no medical records
 
-    vi.mocked(db.update).mockReturnValueOnce(
-      makeUpdateChain([{ ...mockDoctor.user, isActive: false }]) as any
-    );
+    vi.mocked(db.delete)
+      .mockReturnValueOnce(makeDeleteChain() as any) // delete doctor
+      .mockReturnValueOnce(makeDeleteChain() as any); // delete user
 
     const token = signAccessToken({ userId: "admin-999", role: "admin" });
     const res = await app.request(`${BASE}/${mockDoctor.id}`, {
@@ -358,6 +371,226 @@ describe("DELETE /doctors/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(db.update).toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.message).toMatch(/deleted/i);
+    expect(db.delete).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── GET /doctors/:id/schedules ───────────────────────────────────────────────
+
+const mockScheduleRow = {
+  id: "00000000-0000-0000-0000-000000000301",
+  doctorId: mockDoctor.id,
+  dayOfWeek: "monday",
+  startTime: "09:00",
+  endTime: "17:00",
+  slotDurationMinutes: 30,
+};
+
+describe("GET /doctors/:id/schedules", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("returns 401 when not authenticated", async () => {
+    const res = await app.request(`${BASE}/${mockDoctor.id}/schedules`);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when doctor does not exist", async () => {
+    const token = signAccessToken({ userId: "patient-id", role: "patient" });
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]) as any);
+
+    const res = await app.request(
+      `${BASE}/00000000-0000-0000-0000-ffffffffffff/schedules`,
+      { headers: bearer(token) }
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 200 with schedule array", async () => {
+    const token = signAccessToken({ userId: "patient-id", role: "patient" });
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(makeSimpleSelectChain([mockScheduleRow]) as any); // fetch schedule
+
+    const res = await app.request(`${BASE}/${mockDoctor.id}/schedules`, {
+      headers: bearer(token),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].dayOfWeek).toBe("monday");
+    expect(body[0].slotDurationMinutes).toBe(30);
+  });
+});
+
+// ─── PUT /doctors/:id/schedules ───────────────────────────────────────────────
+
+describe("PUT /doctors/:id/schedules", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    (db.transaction as any).mockImplementation((cb: any) => cb(db));
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    const res = await app.request(`${BASE}/${mockDoctor.id}/schedules`, {
+      method: "PUT",
+      headers: jsonHeaders,
+      body: JSON.stringify({ slotDurationMinutes: 30, days: [] }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when not the owning doctor", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeSelectChain([mockDoctor]) as any
+    );
+
+    const token = signAccessToken({
+      userId: "00000000-0000-0000-0000-000000000888",
+      role: "doctor",
+    });
+    const res = await app.request(`${BASE}/${mockDoctor.id}/schedules`, {
+      method: "PUT",
+      headers: { ...bearer(token), ...jsonHeaders },
+      body: JSON.stringify({ slotDurationMinutes: 30, days: [] }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 409 when confirmed appointments conflict with new window", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(
+        // conflict check returns conflicting appt
+        makeSimpleSelectChain([
+          {
+            startTime: "08:00:00", // before new startTime 09:00
+            endTime: "08:30:00",
+            appointmentDate: "2026-04-13", // Monday
+          },
+        ]) as any
+      );
+
+    const token = signAccessToken({
+      userId: mockDoctor.userId,
+      role: "doctor",
+    });
+    const res = await app.request(`${BASE}/${mockDoctor.id}/schedules`, {
+      method: "PUT",
+      headers: { ...bearer(token), ...jsonHeaders },
+      body: JSON.stringify({
+        slotDurationMinutes: 30,
+        days: [{ dayOfWeek: "monday", startTime: "09:00", endTime: "17:00" }],
+      }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("returns 200 and full-replaces the schedule", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(makeSimpleSelectChain([]) as any) // conflict check — no conflicts
+      .mockReturnValueOnce(makeSimpleSelectChain([mockScheduleRow]) as any); // fetch new schedule
+
+    vi.mocked(db.delete).mockReturnValueOnce(makeDeleteChain() as any);
+    vi.mocked(db.insert).mockReturnValueOnce(
+      makeInsertChain([mockScheduleRow]) as any
+    );
+
+    const token = signAccessToken({
+      userId: mockDoctor.userId,
+      role: "doctor",
+    });
+    const res = await app.request(`${BASE}/${mockDoctor.id}/schedules`, {
+      method: "PUT",
+      headers: { ...bearer(token), ...jsonHeaders },
+      body: JSON.stringify({
+        slotDurationMinutes: 30,
+        days: [{ dayOfWeek: "monday", startTime: "09:00", endTime: "17:00" }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0].dayOfWeek).toBe("monday");
+  });
+
+  it("returns 200 with empty array when days is empty (clears schedule)", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(makeSimpleSelectChain([]) as any) // conflict check
+      .mockReturnValueOnce(makeSimpleSelectChain([]) as any); // fetch new schedule
+
+    vi.mocked(db.delete).mockReturnValueOnce(makeDeleteChain() as any);
+
+    const token = signAccessToken({
+      userId: mockDoctor.userId,
+      role: "doctor",
+    });
+    const res = await app.request(`${BASE}/${mockDoctor.id}/schedules`, {
+      method: "PUT",
+      headers: { ...bearer(token), ...jsonHeaders },
+      body: JSON.stringify({ slotDurationMinutes: 30, days: [] }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveLength(0);
+  });
+});
+
+// ─── GET /doctors/:id/available-slots ────────────────────────────────────────
+
+describe("GET /doctors/:id/available-slots", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("returns 404 when doctor does not exist", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]) as any);
+
+    const res = await app.request(
+      `${BASE}/00000000-0000-0000-0000-ffffffffffff/available-slots?date=2026-05-04`
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 when date query param is missing", async () => {
+    const res = await app.request(`${BASE}/${mockDoctor.id}/available-slots`);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 with array of ISO slot strings", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(
+        // service: find schedule (monday)
+        makeSelectChain([
+          { ...mockScheduleRow, startTime: "09:00", endTime: "10:00" },
+        ]) as any
+      )
+      .mockReturnValueOnce(makeSimpleSelectChain([]) as any); // service: no booked appts
+
+    // 2026-05-04 is a Monday
+    const res = await app.request(
+      `${BASE}/${mockDoctor.id}/available-slots?date=2026-05-04`
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body[0]).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it("returns 200 with empty array when no schedule for that day", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(makeSelectChain([]) as any); // service: no schedule row
+
+    // 2026-05-05 is a Tuesday (no schedule for Tuesday in mockScheduleRow)
+    const res = await app.request(
+      `${BASE}/${mockDoctor.id}/available-slots?date=2026-05-05`
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual([]);
   });
 });

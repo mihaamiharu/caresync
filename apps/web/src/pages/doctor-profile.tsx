@@ -1,20 +1,324 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { doctorsApi } from "@/lib/api-client";
-import type { Doctor } from "@caresync/shared";
-import {
-  ArrowLeft,
-  Mail,
-  Phone,
-  Award,
-  Building2,
-  Calendar,
-  Star,
-} from "lucide-react";
+import { doctorsApi, schedulesApi } from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
+import type { Doctor, DoctorSchedule } from "@caresync/shared";
+import { ArrowLeft, Mail, Phone, Award, Building2, Star } from "lucide-react";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DAYS = [
+  { key: "monday", label: "Monday" },
+  { key: "tuesday", label: "Tuesday" },
+  { key: "wednesday", label: "Wednesday" },
+  { key: "thursday", label: "Thursday" },
+  { key: "friday", label: "Friday" },
+  { key: "saturday", label: "Saturday" },
+  { key: "sunday", label: "Sunday" },
+] as const;
+
+type DayKey = (typeof DAYS)[number]["key"];
+
+// ─── Schedule form (owning doctor only) ──────────────────────────────────────
+
+interface DayConfig {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+const defaultDayConfig: DayConfig = {
+  enabled: false,
+  startTime: "09:00",
+  endTime: "17:00",
+};
+
+function makeInitialDays(): Record<DayKey, DayConfig> {
+  return Object.fromEntries(
+    DAYS.map((d) => [d.key, { ...defaultDayConfig }])
+  ) as Record<DayKey, DayConfig>;
+}
+
+function DoctorScheduleForm({ doctorId }: { doctorId: string }) {
+  const [slotDuration, setSlotDuration] = useState(30);
+  const [days, setDays] = useState<Record<DayKey, DayConfig>>(makeInitialDays);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load existing schedule on mount
+  useEffect(() => {
+    schedulesApi
+      .getSchedule(doctorId)
+      .then((schedule: DoctorSchedule[]) => {
+        if (schedule.length === 0) return;
+        setDays((prev) => {
+          const next = { ...prev };
+          for (const row of schedule) {
+            const key = row.dayOfWeek as DayKey;
+            if (next[key]) {
+              next[key] = {
+                enabled: true,
+                startTime: row.startTime,
+                endTime: row.endTime,
+              };
+            }
+          }
+          return next;
+        });
+        setSlotDuration(schedule[0].slotDurationMinutes);
+      })
+      .catch(() => {
+        setLoadError(
+          "Failed to load your schedule. Please refresh and try again."
+        );
+      });
+  }, [doctorId]);
+
+  const toggleDay = (key: DayKey) => {
+    setDays((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], enabled: !prev[key].enabled },
+    }));
+  };
+
+  const updateTime = (
+    key: DayKey,
+    field: "startTime" | "endTime",
+    value: string
+  ) => {
+    setDays((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setSuccess(false);
+    setError(null);
+
+    const activeDays = DAYS.filter((d) => days[d.key].enabled).map((d) => ({
+      dayOfWeek: d.key,
+      startTime: days[d.key].startTime,
+      endTime: days[d.key].endTime,
+    }));
+
+    try {
+      await schedulesApi.putSchedule(doctorId, {
+        slotDurationMinutes: slotDuration,
+        days: activeDays,
+      });
+      setSuccess(true);
+    } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: { data?: { message?: string } };
+      };
+      setError(axiosErr.response?.data?.message ?? "Failed to save schedule");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form
+      data-testid="schedule-form"
+      onSubmit={handleSubmit}
+      className="space-y-4"
+    >
+      {loadError && (
+        <p
+          data-testid="schedule-load-error"
+          className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {loadError}
+        </p>
+      )}
+      {success && (
+        <p
+          data-testid="schedule-success"
+          className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700"
+        >
+          Schedule saved successfully.
+        </p>
+      )}
+      {error && (
+        <p
+          data-testid="schedule-error"
+          className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="flex items-center gap-3">
+        <label
+          htmlFor="slot-duration"
+          className="text-sm font-medium text-foreground"
+        >
+          Slot duration (min)
+        </label>
+        <input
+          id="slot-duration"
+          data-testid="slot-duration-input"
+          type="number"
+          min={5}
+          max={120}
+          value={slotDuration}
+          onChange={(e) => setSlotDuration(Number(e.target.value))}
+          className="w-20 rounded-md border border-border bg-background px-2 py-1 text-sm"
+        />
+      </div>
+
+      <div className="space-y-3">
+        {DAYS.map(({ key, label }) => (
+          <div key={key} className="flex flex-wrap items-center gap-3">
+            <label className="flex w-28 cursor-pointer items-center gap-2 text-sm">
+              <input
+                data-testid={`day-toggle-${key}`}
+                type="checkbox"
+                checked={days[key].enabled}
+                onChange={() => toggleDay(key)}
+                className="rounded"
+              />
+              {label}
+            </label>
+
+            {days[key].enabled && (
+              <div className="flex items-center gap-2">
+                <input
+                  data-testid={`start-time-${key}`}
+                  type="time"
+                  value={days[key].startTime}
+                  onChange={(e) => updateTime(key, "startTime", e.target.value)}
+                  className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                />
+                <span className="text-sm text-muted-foreground">to</span>
+                <input
+                  data-testid={`end-time-${key}`}
+                  type="time"
+                  value={days[key].endTime}
+                  onChange={(e) => updateTime(key, "endTime", e.target.value)}
+                  className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <button
+        data-testid="schedule-submit"
+        type="submit"
+        disabled={submitting}
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {submitting ? "Saving…" : "Save Schedule"}
+      </button>
+    </form>
+  );
+}
+
+// ─── Availability viewer (all users) ─────────────────────────────────────────
+
+function displayTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    timeZone: "Asia/Bangkok",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function DoctorAvailabilityViewer({ doctorId }: { doctorId: string }) {
+  const [date, setDate] = useState("");
+  const [slots, setSlots] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
+  const [slotError, setSlotError] = useState<string | null>(null);
+
+  const fetchSlots = (d: string) => {
+    setLoading(true);
+    setFetched(false);
+    setSlotError(null);
+    schedulesApi
+      .getAvailableSlots(doctorId, d)
+      .then((result) => {
+        setSlots(result);
+      })
+      .catch(() => {
+        setSlots([]);
+        setSlotError("Failed to load available slots. Please try again.");
+      })
+      .finally(() => {
+        setLoading(false);
+        setFetched(true);
+      });
+  };
+
+  return (
+    <div data-testid="slot-viewer" className="space-y-4">
+      <input
+        data-testid="slot-date-picker"
+        type="date"
+        value={date}
+        onChange={(e) => {
+          setDate(e.target.value);
+          if (e.target.value) fetchSlots(e.target.value);
+        }}
+        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+      />
+
+      {loading && (
+        <p data-testid="slot-loading" className="text-sm text-muted-foreground">
+          Loading slots…
+        </p>
+      )}
+
+      {fetched && !loading && slotError && (
+        <p
+          data-testid="slot-fetch-error"
+          className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {slotError}
+        </p>
+      )}
+
+      {fetched && !loading && !slotError && slots.length === 0 && (
+        <p
+          data-testid="slot-empty"
+          className="text-sm text-muted-foreground italic"
+        >
+          No available slots for this date.
+        </p>
+      )}
+
+      {fetched && !loading && !slotError && slots.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {slots.map((iso) => (
+            <button
+              key={iso}
+              data-testid={`slot-${iso}`}
+              type="button"
+              className="rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              {displayTime(iso)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Doctor profile page ──────────────────────────────────────────────────────
 
 export function DoctorProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +356,7 @@ export function DoctorProfilePage() {
   }
 
   const fullName = `Dr. ${doctor.user?.firstName} ${doctor.user?.lastName}`;
+  const isOwnProfile = user?.role === "doctor" && user.id === doctor.userId;
 
   return (
     <div data-testid="doctor-profile-page">
@@ -127,7 +432,7 @@ export function DoctorProfilePage() {
           </div>
         </div>
 
-        {/* Right Column: Bio & Schedule */}
+        {/* Right Column: Bio, Schedule Form & Availability Viewer */}
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-foreground">
@@ -138,17 +443,22 @@ export function DoctorProfilePage() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">
-                Availability
+          {/* Schedule management — owning doctor only */}
+          {isOwnProfile && (
+            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold text-foreground">
+                Manage Schedule
               </h2>
-              <Calendar className="h-5 w-5 text-muted-foreground" />
+              <DoctorScheduleForm doctorId={doctor.id} />
             </div>
-            <p className="text-sm text-muted-foreground italic">
-              Doctor's regular schedule will be displayed here. (Work in
-              progress)
-            </p>
+          )}
+
+          {/* Availability viewer — all users */}
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">
+              Available Slots
+            </h2>
+            <DoctorAvailabilityViewer doctorId={doctor.id} />
           </div>
         </div>
       </div>

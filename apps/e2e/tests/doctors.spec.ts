@@ -24,7 +24,7 @@ async function registerAndLogin(
   expect(response.ok()).toBeTruthy();
   const newUser = await response.json();
   if (cleanupHelper) {
-    cleanupHelper.addUser(newUser.id);
+    cleanupHelper.addUser(newUser.user?.id ?? newUser.id);
   }
 
   await loginPage.goto();

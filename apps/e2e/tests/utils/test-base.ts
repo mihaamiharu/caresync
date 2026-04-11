@@ -5,6 +5,7 @@ import { DepartmentsPage } from "../poms/DepartmentsPage";
 import { ProfilePage } from "../poms/ProfilePage";
 import { RegisterPage } from "../poms/RegisterPage";
 import { DashboardPage } from "../poms/DashboardPage";
+import { DoctorProfilePage } from "../poms/DoctorProfilePage";
 import { config } from "./config";
 
 export class CleanupHelper {
@@ -69,6 +70,7 @@ export const test = base.extend<{
   profilePage: ProfilePage;
   registerPage: RegisterPage;
   dashboardPage: DashboardPage;
+  doctorProfilePage: DoctorProfilePage;
 }>({
   cleanup: async ({ request }, use) => {
     const helper = new CleanupHelper();
@@ -93,6 +95,9 @@ export const test = base.extend<{
   },
   dashboardPage: async ({ page }, use) => {
     await use(new DashboardPage(page));
+  },
+  doctorProfilePage: async ({ page }, use) => {
+    await use(new DoctorProfilePage(page));
   },
 });
 

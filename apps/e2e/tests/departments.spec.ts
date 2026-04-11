@@ -24,7 +24,7 @@ async function registerAndLogin(
   expect(response.ok()).toBeTruthy();
   const newUser = await response.json();
   if (cleanupHelper) {
-    cleanupHelper.addUser(newUser.id);
+    cleanupHelper.addUser(newUser.user?.id ?? newUser.id);
   }
 
   await loginPage.goto();
@@ -236,10 +236,11 @@ test.describe("Departments — admin CRUD", () => {
 
     await departmentsPage.goto();
     await departmentsPage.isLoaded();
+    await departmentsPage.waitForContent();
 
     // Search for the seeded department to handle pagination/data bloat
     await departmentsPage.searchInput.fill(deptName);
-    await departmentsPage.waitForContent();
+    await departmentsPage.editButton(created.id).waitFor({ state: "visible" });
 
     await departmentsPage.editButton(created.id).click();
     await expect(departmentsPage.formModal).toBeVisible();
@@ -290,10 +291,11 @@ test.describe("Departments — admin CRUD", () => {
 
     await departmentsPage.goto();
     await departmentsPage.isLoaded();
+    await departmentsPage.waitForContent();
 
     // Search for the seeded department
     await departmentsPage.searchInput.fill(deptName);
-    await departmentsPage.waitForContent();
+    await departmentsPage.card(created.id).waitFor({ state: "visible" });
 
     await expect(page.getByText(deptName)).toBeVisible();
 

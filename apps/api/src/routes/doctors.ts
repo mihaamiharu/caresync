@@ -1,9 +1,17 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, ilike, or, sql, and, asc } from "drizzle-orm";
+import { eq, ilike, or, sql, and, asc, inArray } from "drizzle-orm";
 import { db } from "../db";
-import { users, doctors, departments, appointments, medicalRecords } from "../db/schema";
+import {
+  users,
+  doctors,
+  departments,
+  appointments,
+  medicalRecords,
+  doctorSchedules,
+} from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { hashPassword } from "../lib/password";
+import { computeAvailableSlots } from "../lib/schedule-service";
 import type { AppEnv } from "../app";
 
 export const doctorsRoute = new OpenAPIHono<AppEnv>();
@@ -427,18 +435,16 @@ doctorsRoute.openapi(updateDoctorRoute, async (c) => {
       // Update doctor info
       const updateData: Partial<typeof doctors.$inferInsert> = {};
       if (body.bio !== undefined) updateData.bio = body.bio;
-      
+
       // Only admins can change department or specialization
       if (authUserRole === "admin") {
-        if (body.specialization) updateData.specialization = body.specialization;
+        if (body.specialization)
+          updateData.specialization = body.specialization;
         if (body.departmentId) updateData.departmentId = body.departmentId;
       }
 
       if (Object.keys(updateData).length > 0) {
-        await tx
-          .update(doctors)
-          .set(updateData)
-          .where(eq(doctors.id, id));
+        await tx.update(doctors).set(updateData).where(eq(doctors.id, id));
       }
 
       // Fetch full updated doctor with user and department
@@ -541,7 +547,13 @@ doctorsRoute.openapi(deleteDoctorRoute, async (c) => {
     .limit(1);
 
   if (existingAppointment) {
-    return c.json({ message: "Cannot delete doctor with existing appointments. Deactivate them instead." }, 400);
+    return c.json(
+      {
+        message:
+          "Cannot delete doctor with existing appointments. Deactivate them instead.",
+      },
+      400
+    );
   }
 
   const [existingRecord] = await db
@@ -551,21 +563,301 @@ doctorsRoute.openapi(deleteDoctorRoute, async (c) => {
     .limit(1);
 
   if (existingRecord) {
-    return c.json({ message: "Cannot delete doctor with medical records. Deactivate them instead." }, 400);
+    return c.json(
+      {
+        message:
+          "Cannot delete doctor with medical records. Deactivate them instead.",
+      },
+      400
+    );
   }
 
   try {
     await db.transaction(async (tx) => {
-      // Soft delete: set user to inactive
-      await tx
-        .update(users)
-        .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(users.id, doctor.userId));
+      await tx.delete(doctors).where(eq(doctors.id, id));
+      await tx.delete(users).where(eq(users.id, doctor.userId));
     });
 
-    return c.json({ message: "Doctor deactivated successfully" }, 200);
+    return c.json({ message: "Doctor deleted successfully" }, 200);
   } catch (error) {
-    console.error("Failed to deactivate doctor:", error);
-    return c.json({ message: "Failed to deactivate doctor" }, 500);
+    console.error("Failed to delete doctor:", error);
+    return c.json({ message: "Failed to delete doctor" }, 500);
   }
+});
+
+// ─── GET /doctors/:id/schedules ───────────────────────────────────────────────
+
+const scheduleRowResponse = z.object({
+  id: z.string(),
+  doctorId: z.string(),
+  dayOfWeek: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  slotDurationMinutes: z.number(),
+});
+
+const getScheduleRoute = createRoute({
+  method: "get",
+  path: "/doctors/{id}/schedules",
+  tags: ["Doctors"],
+  summary: "Get doctor weekly schedule",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: "Doctor schedule",
+      content: { "application/json": { schema: z.array(scheduleRowResponse) } },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Doctor not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+doctorsRoute.openapi(getScheduleRoute, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const [doctor] = await db
+    .select()
+    .from(doctors)
+    .where(eq(doctors.id, id))
+    .limit(1);
+
+  if (!doctor) {
+    return c.json({ message: "Doctor not found" }, 404);
+  }
+
+  const schedule = await db
+    .select()
+    .from(doctorSchedules)
+    .where(eq(doctorSchedules.doctorId, id));
+
+  return c.json(schedule, 200);
+});
+
+// ─── PUT /doctors/:id/schedules ───────────────────────────────────────────────
+
+const DAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
+
+const putScheduleBody = z.object({
+  slotDurationMinutes: z.number().int().min(5).max(120),
+  days: z
+    .array(
+      z.object({
+        dayOfWeek: z.enum([
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+        ]),
+        startTime: z.string().regex(/^\d{2}:\d{2}$/),
+        endTime: z.string().regex(/^\d{2}:\d{2}$/),
+      })
+    )
+    .max(7),
+});
+
+const putScheduleRoute = createRoute({
+  method: "put",
+  path: "/doctors/{id}/schedules",
+  tags: ["Doctors"],
+  summary: "Replace doctor weekly schedule (doctor only)",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireAuth] as const,
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      content: { "application/json": { schema: putScheduleBody } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      description: "Updated schedule",
+      content: { "application/json": { schema: z.array(scheduleRowResponse) } },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Not the owning doctor",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Doctor not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    409: {
+      description: "Conflicts with existing confirmed appointments",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    500: {
+      description: "Internal server error",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+doctorsRoute.openapi(putScheduleRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const body = c.req.valid("json");
+  const authUserId = c.get("userId");
+
+  // 1. Find doctor
+  const [doctor] = await db
+    .select()
+    .from(doctors)
+    .where(eq(doctors.id, id))
+    .limit(1);
+
+  if (!doctor) {
+    return c.json({ message: "Doctor not found" }, 404);
+  }
+
+  // 2. Only the owning doctor may update their schedule
+  if (authUserId !== doctor.userId) {
+    return c.json({ message: "Insufficient permissions" }, 403);
+  }
+
+  // 3. Conflict check — fetch all future confirmed/in-progress appointments
+  const futureAppts = await db
+    .select({
+      startTime: appointments.startTime,
+      endTime: appointments.endTime,
+      appointmentDate: appointments.appointmentDate,
+    })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.doctorId, id),
+        inArray(appointments.status, ["confirmed", "in-progress"]),
+        sql`${appointments.appointmentDate} >= CURRENT_DATE`
+      )
+    );
+
+  const newScheduleMap = new Map(body.days.map((d) => [d.dayOfWeek, d]));
+
+  const normalizeTime = (t: string) => t.substring(0, 5); // "09:00:00" → "09:00"
+
+  for (const appt of futureAppts) {
+    const dayName = DAY_NAMES[new Date(appt.appointmentDate).getUTCDay()];
+    const newDay = newScheduleMap.get(dayName);
+
+    if (
+      !newDay ||
+      normalizeTime(appt.startTime) < newDay.startTime ||
+      normalizeTime(appt.endTime) > newDay.endTime
+    ) {
+      return c.json(
+        {
+          message:
+            "Schedule update would conflict with existing confirmed appointments",
+        },
+        409
+      );
+    }
+  }
+
+  // 4. Full replace in transaction
+  try {
+    const newSchedule = await db.transaction(async (tx) => {
+      await tx.delete(doctorSchedules).where(eq(doctorSchedules.doctorId, id));
+
+      if (body.days.length > 0) {
+        await tx
+          .insert(doctorSchedules)
+          .values(
+            body.days.map((day) => ({
+              doctorId: id,
+              dayOfWeek: day.dayOfWeek,
+              startTime: day.startTime,
+              endTime: day.endTime,
+              slotDurationMinutes: body.slotDurationMinutes,
+            }))
+          )
+          .returning();
+      }
+
+      return await tx
+        .select()
+        .from(doctorSchedules)
+        .where(eq(doctorSchedules.doctorId, id));
+    });
+
+    return c.json(newSchedule, 200);
+  } catch (error) {
+    console.error("Failed to update schedule:", error);
+    return c.json({ message: "Failed to update schedule" }, 500);
+  }
+});
+
+// ─── GET /doctors/:id/available-slots ────────────────────────────────────────
+
+const getAvailableSlotsQuery = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
+    .openapi({ example: "2026-05-04" }),
+});
+
+const getAvailableSlotsRoute = createRoute({
+  method: "get",
+  path: "/doctors/{id}/available-slots",
+  tags: ["Doctors"],
+  summary: "Get available booking slots for a doctor on a given date",
+  request: {
+    params: z.object({ id: z.string() }),
+    query: getAvailableSlotsQuery,
+  },
+  responses: {
+    200: {
+      description: "Array of available slot ISO UTC datetimes",
+      content: { "application/json": { schema: z.array(z.string()) } },
+    },
+    400: {
+      description: "Invalid date format",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Doctor not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+doctorsRoute.openapi(getAvailableSlotsRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const { date } = c.req.valid("query");
+
+  const [doctor] = await db
+    .select()
+    .from(doctors)
+    .where(eq(doctors.id, id))
+    .limit(1);
+
+  if (!doctor) {
+    return c.json({ message: "Doctor not found" }, 404);
+  }
+
+  const slots = await computeAvailableSlots(id, date, db);
+
+  return c.json(slots, 200);
 });
