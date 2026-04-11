@@ -1,18 +1,16 @@
-import {
-  test,
-  expect,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
+import { type APIRequestContext, type Page } from "@playwright/test";
+import { test, expect, CleanupHelper } from "./utils/test-base";
 import { faker } from "@faker-js/faker";
-import { LoginPage } from "./poms/LoginPage";
-import { DoctorsPage } from "./poms/DoctorsPage";
 import { config } from "./utils/config";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function registerAndLogin(page: Page, request: APIRequestContext) {
-  const loginPage = new LoginPage(page);
+async function registerAndLogin(
+  page: Page,
+  request: APIRequestContext,
+  loginPage: any,
+  cleanupHelper?: CleanupHelper
+) {
   const user = {
     email: faker.internet.email().toLowerCase(),
     password: faker.internet.password({ length: 12 }) + "A!",
@@ -24,6 +22,10 @@ async function registerAndLogin(page: Page, request: APIRequestContext) {
     data: { role: "patient", ...user },
   });
   expect(response.ok()).toBeTruthy();
+  const newUser = await response.json();
+  if (cleanupHelper) {
+    cleanupHelper.addUser(newUser.id);
+  }
 
   await loginPage.goto();
   await loginPage.login(user.email, user.password);
@@ -32,8 +34,7 @@ async function registerAndLogin(page: Page, request: APIRequestContext) {
   return user;
 }
 
-async function adminLogin(page: Page) {
-  const loginPage = new LoginPage(page);
+async function adminLogin(page: Page, loginPage: any) {
   await loginPage.goto();
   await loginPage.login(config.adminEmail, config.adminPassword);
   await page.waitForURL("/dashboard");
@@ -42,14 +43,11 @@ async function adminLogin(page: Page) {
 // ─── Patient / authenticated-user view ────────────────────────────────────────
 
 test.describe("Doctors — patient view", () => {
-  let doctorsPage: DoctorsPage;
-
-  test.beforeEach(async ({ page, request }) => {
-    doctorsPage = new DoctorsPage(page);
-    await registerAndLogin(page, request);
+  test.beforeEach(async ({ page, request, loginPage, cleanup }) => {
+    await registerAndLogin(page, request, loginPage, cleanup);
   });
 
-  test("DOC-1: Navigate to /doctors via URL", async ({ page }) => {
+  test("DOC-1: Navigate to /doctors via URL", async ({ page, doctorsPage }) => {
     await doctorsPage.goto();
     await doctorsPage.isLoaded();
     await expect(
@@ -57,7 +55,9 @@ test.describe("Doctors — patient view", () => {
     ).toBeVisible();
   });
 
-  test("DOC-2: Non-admin does NOT see the Create Doctor button", async () => {
+  test("DOC-2: Non-admin does NOT see the Create Doctor button", async ({
+    doctorsPage,
+  }) => {
     await doctorsPage.goto();
     await doctorsPage.isLoaded();
     await doctorsPage.waitForContent();
@@ -69,19 +69,19 @@ test.describe("Doctors — patient view", () => {
 // ─── Admin CRUD ───────────────────────────────────────────────────────────────
 
 test.describe("Doctors — admin CRUD", () => {
-  let doctorsPage: DoctorsPage;
-
-  test.beforeEach(async ({ page }) => {
-    doctorsPage = new DoctorsPage(page);
-
+  test.beforeEach(async ({ page, loginPage }) => {
     if (!config.adminEmail) {
       return;
     }
-
-    await adminLogin(page);
+    await adminLogin(page, loginPage);
   });
 
-  test("DOC-3: Admin can create a new doctor", async ({ page, request }) => {
+  test("DOC-3: Admin can create a new doctor", async ({
+    page,
+    request,
+    doctorsPage,
+    cleanup,
+  }) => {
     test.skip(!config.adminEmail, "Set ADMIN_EMAIL + ADMIN_PASSWORD env vars");
 
     // 1. Need a department first
@@ -96,6 +96,7 @@ test.describe("Doctors — admin CRUD", () => {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     const dept = await deptRes.json();
+    cleanup.addDepartment(dept.id);
 
     const doctorData = {
       firstName: faker.person.firstName(),
@@ -110,28 +111,31 @@ test.describe("Doctors — admin CRUD", () => {
     await doctorsPage.goto();
     await doctorsPage.isLoaded();
     await doctorsPage.createButton.click();
-    
+
     // Wait for the department to be available in the select
-    await expect(page.locator(`select[data-testid="doctor-department-input"] option[value="${doctorData.departmentId}"]`)).toBeAttached();
+    await expect(
+      page.locator(
+        `select[data-testid="doctor-department-input"] option[value="${doctorData.departmentId}"]`
+      )
+    ).toBeAttached();
 
     await doctorsPage.fillAndSubmitForm(doctorData);
-
-    // Wait for either the modal to close OR an error message to appear
-    await Promise.race([
-      doctorsPage.formModal.waitFor({ state: 'hidden' }),
-      page.locator('.text-destructive').first().waitFor({ state: 'visible' }).catch(() => {}),
-    ]);
-
-    if (await doctorsPage.formModal.isVisible()) {
-      const serverError = await doctorsPage.formError.innerText().catch(() => null);
-      const fieldErrors = await page.locator('.text-destructive').allInnerTexts();
-      console.error(`Form submission failed. Server Error: ${serverError || 'None'}. Field Errors: ${fieldErrors.join(', ')}`);
-    }
-    
     await expect(doctorsPage.formModal).not.toBeVisible();
-    
+
     // Check for the doctor's name in a way that handles special characters
     const fullName = `Dr. ${doctorData.firstName} ${doctorData.lastName}`;
-    await expect(page.locator('h3', { hasText: fullName })).toBeVisible();
+    const doctorCard = page.locator("h3", { hasText: fullName });
+    await expect(doctorCard).toBeVisible();
+
+    const doctorsListRes = await request.get(
+      `${config.apiUrl}/api/v1/doctors?search=${doctorData.email}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    const { data: doctorsData } = await doctorsListRes.json();
+    if (doctorsData.length > 0) {
+      cleanup.addDoctor(doctorsData[0].id);
+    }
   });
 });
