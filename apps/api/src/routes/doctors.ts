@@ -307,7 +307,13 @@ doctorsRoute.openapi(createDoctorRoute, async (c) => {
         })
         .returning();
 
-      return { ...doctor, user };
+      const [department] = await tx
+        .select()
+        .from(departments)
+        .where(eq(departments.id, body.departmentId))
+        .limit(1);
+
+      return { ...doctor, user, department };
     });
 
     return c.json(result, 201);

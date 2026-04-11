@@ -97,17 +97,26 @@ function DoctorFormModal({ doctor, onClose, onSaved }: DoctorFormModalProps) {
         response?: {
           data?: {
             message?: string;
-            errors?: Record<string, { _errors: string[] }>;
+            errors?: any;
+            error?: {
+              issues?: Array<{ path: string[]; message: string }>;
+            };
           };
         };
       };
       const data = axiosError.response?.data;
       if (data?.message) {
         setServerError(data.message);
+      } else if (data?.error?.issues) {
+        // Flatten Hono/Zod-OpenAPI issues
+        const errorMsgs = data.error.issues
+          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+          .join(" | ");
+        setServerError(errorMsgs || "Validation failed");
       } else if (data?.errors) {
-        // Flatten Zod-style errors from Hono OpenAPI
+        // Flatten other potential error structures
         const errorMsgs = Object.entries(data.errors)
-          .map(([field, error]) => `${field}: ${error._errors?.join(", ")}`)
+          .map(([field, error]: [string, any]) => `${field}: ${error._errors?.join(", ") || error}`)
           .join(" | ");
         setServerError(errorMsgs || "Validation failed");
       } else {
