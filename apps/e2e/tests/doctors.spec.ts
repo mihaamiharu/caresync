@@ -116,7 +116,12 @@ test.describe("Doctors — admin CRUD", () => {
 
     await doctorsPage.fillAndSubmitForm(doctorData);
 
-    // Modal closes and new card appears
+    // Wait for either the modal to close OR an error message to appear
+    await Promise.race([
+      doctorsPage.formModal.waitFor({ state: 'hidden' }),
+      page.locator('.text-destructive').first().waitFor({ state: 'visible' }).catch(() => {}),
+    ]);
+
     if (await doctorsPage.formModal.isVisible()) {
       const serverError = await doctorsPage.formError.innerText().catch(() => null);
       const fieldErrors = await page.locator('.text-destructive').allInnerTexts();
