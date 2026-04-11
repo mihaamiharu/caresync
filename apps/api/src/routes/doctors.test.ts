@@ -198,6 +198,11 @@ describe("POST /doctors", () => {
       ]) as any
     );
 
+    // 5. Fetch department
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeSelectChain([mockDoctor.department]) as any
+    );
+
     const res = await app.request(BASE, {
       method: "POST",
       headers: { ...bearer(token), ...jsonHeaders },
