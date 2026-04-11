@@ -11,6 +11,7 @@ import {
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { hashPassword } from "../lib/password";
+import { computeAvailableSlots } from "../lib/schedule-service";
 import type { AppEnv } from "../app";
 
 export const doctorsRoute = new OpenAPIHono<AppEnv>();
@@ -809,4 +810,57 @@ doctorsRoute.openapi(putScheduleRoute, async (c) => {
     console.error("Failed to update schedule:", error);
     return c.json({ message: "Failed to update schedule" }, 500);
   }
+});
+
+// ─── GET /doctors/:id/available-slots ────────────────────────────────────────
+
+const getAvailableSlotsQuery = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
+    .openapi({ example: "2026-05-04" }),
+});
+
+const getAvailableSlotsRoute = createRoute({
+  method: "get",
+  path: "/doctors/{id}/available-slots",
+  tags: ["Doctors"],
+  summary: "Get available booking slots for a doctor on a given date",
+  request: {
+    params: z.object({ id: z.string() }),
+    query: getAvailableSlotsQuery,
+  },
+  responses: {
+    200: {
+      description: "Array of available slot ISO UTC datetimes",
+      content: { "application/json": { schema: z.array(z.string()) } },
+    },
+    400: {
+      description: "Invalid date format",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Doctor not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+doctorsRoute.openapi(getAvailableSlotsRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const { date } = c.req.valid("query");
+
+  const [doctor] = await db
+    .select()
+    .from(doctors)
+    .where(eq(doctors.id, id))
+    .limit(1);
+
+  if (!doctor) {
+    return c.json({ message: "Doctor not found" }, 404);
+  }
+
+  const slots = await computeAvailableSlots(id, date, db);
+
+  return c.json(slots, 200);
 });

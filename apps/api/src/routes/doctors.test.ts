@@ -44,13 +44,11 @@ const mockDoctor = {
 function makeSelectChain(result: unknown[]) {
   const limit = vi.fn().mockResolvedValue(result);
   const where = vi.fn().mockReturnValue({ limit });
-  const innerJoin = vi
-    .fn()
-    .mockReturnValue({
-      innerJoin: vi.fn().mockReturnValue({ where, limit }),
-      where,
-      limit,
-    });
+  const innerJoin = vi.fn().mockReturnValue({
+    innerJoin: vi.fn().mockReturnValue({ where, limit }),
+    where,
+    limit,
+  });
   const from = vi.fn().mockReturnValue({ innerJoin, where, limit });
   return { from };
 }
@@ -536,5 +534,61 @@ describe("PUT /doctors/:id/schedules", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveLength(0);
+  });
+});
+
+// ─── GET /doctors/:id/available-slots ────────────────────────────────────────
+
+describe("GET /doctors/:id/available-slots", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("returns 404 when doctor does not exist", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]) as any);
+
+    const res = await app.request(
+      `${BASE}/00000000-0000-0000-0000-ffffffffffff/available-slots?date=2026-05-04`
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 when date query param is missing", async () => {
+    const res = await app.request(`${BASE}/${mockDoctor.id}/available-slots`);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 with array of ISO slot strings", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(
+        // service: find schedule (monday)
+        makeSelectChain([
+          { ...mockScheduleRow, startTime: "09:00", endTime: "10:00" },
+        ]) as any
+      )
+      .mockReturnValueOnce(makeSimpleSelectChain([]) as any); // service: no booked appts
+
+    // 2026-05-04 is a Monday
+    const res = await app.request(
+      `${BASE}/${mockDoctor.id}/available-slots?date=2026-05-04`
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body[0]).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it("returns 200 with empty array when no schedule for that day", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(makeSelectChain([]) as any); // service: no schedule row
+
+    // 2026-05-05 is a Tuesday (no schedule for Tuesday in mockScheduleRow)
+    const res = await app.request(
+      `${BASE}/${mockDoctor.id}/available-slots?date=2026-05-05`
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual([]);
   });
 });
