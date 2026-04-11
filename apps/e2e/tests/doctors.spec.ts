@@ -124,8 +124,9 @@ test.describe("Doctors — admin CRUD", () => {
     }
     
     await expect(doctorsPage.formModal).not.toBeVisible();
-    await expect(
-      page.getByText(`Dr. ${doctorData.firstName} ${doctorData.lastName}`)
-    ).toBeVisible();
+    
+    // Check for the doctor's name in a way that handles special characters
+    const fullName = `Dr. ${doctorData.firstName} ${doctorData.lastName}`;
+    await expect(page.locator('h3', { hasText: fullName })).toBeVisible();
   });
 });
