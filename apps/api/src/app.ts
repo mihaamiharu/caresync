@@ -7,6 +7,7 @@ import { healthRoute } from "./routes/health";
 import { authRoute } from "./routes/auth";
 import { usersRoute } from "./routes/users";
 import { departmentsRoute } from "./routes/departments";
+import { doctorsRoute } from "./routes/doctors";
 
 export type AppEnv = {
   Variables: {
@@ -24,7 +25,7 @@ app.use(
   cors({
     origin: ["http://localhost:5173"],
     credentials: true,
-  }),
+  })
 );
 
 // Serve uploaded files
@@ -32,7 +33,7 @@ app.use("/uploads/*", serveStatic({ root: "./" }));
 
 // Root health check (for load balancers and Task 2 acceptance criteria)
 app.get("/health", (c) =>
-  c.json({ status: "ok", timestamp: new Date().toISOString() }),
+  c.json({ status: "ok", timestamp: new Date().toISOString() })
 );
 
 // Routes
@@ -40,6 +41,7 @@ app.route("/api/v1", healthRoute);
 app.route("/api/v1", authRoute);
 app.route("/api/v1", usersRoute);
 app.route("/api/v1", departmentsRoute);
+app.route("/api/v1", doctorsRoute);
 
 // OpenAPI spec
 app.doc("/api/openapi.json", {
@@ -58,5 +60,5 @@ app.get(
   apiReference({
     spec: { url: "/api/openapi.json" },
     theme: "kepler",
-  }),
+  })
 );
