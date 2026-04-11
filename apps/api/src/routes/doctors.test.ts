@@ -354,15 +354,15 @@ describe("DELETE /doctors/:id", () => {
     expect(body.message).toMatch(/appointments/i);
   });
 
-  it("returns 200 and deactivates user (soft delete) if no records", async () => {
+  it("returns 200 and hard-deletes doctor and user if no records", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
       .mockReturnValueOnce(makeSelectChain([]) as any) // no appointments
-      .mockReturnValueOnce(makeSelectChain([]) as any); // no records
+      .mockReturnValueOnce(makeSelectChain([]) as any); // no medical records
 
-    vi.mocked(db.update).mockReturnValueOnce(
-      makeUpdateChain([{ ...mockDoctor.user, isActive: false }]) as any
-    );
+    vi.mocked(db.delete)
+      .mockReturnValueOnce(makeDeleteChain() as any) // delete doctor
+      .mockReturnValueOnce(makeDeleteChain() as any); // delete user
 
     const token = signAccessToken({ userId: "admin-999", role: "admin" });
     const res = await app.request(`${BASE}/${mockDoctor.id}`, {
@@ -371,7 +371,9 @@ describe("DELETE /doctors/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(db.update).toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.message).toMatch(/deleted/i);
+    expect(db.delete).toHaveBeenCalledTimes(2);
   });
 });
 

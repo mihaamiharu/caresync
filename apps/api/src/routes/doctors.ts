@@ -574,17 +574,14 @@ doctorsRoute.openapi(deleteDoctorRoute, async (c) => {
 
   try {
     await db.transaction(async (tx) => {
-      // Soft delete: set user to inactive
-      await tx
-        .update(users)
-        .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(users.id, doctor.userId));
+      await tx.delete(doctors).where(eq(doctors.id, id));
+      await tx.delete(users).where(eq(users.id, doctor.userId));
     });
 
-    return c.json({ message: "Doctor deactivated successfully" }, 200);
+    return c.json({ message: "Doctor deleted successfully" }, 200);
   } catch (error) {
-    console.error("Failed to deactivate doctor:", error);
-    return c.json({ message: "Failed to deactivate doctor" }, 500);
+    console.error("Failed to delete doctor:", error);
+    return c.json({ message: "Failed to delete doctor" }, 500);
   }
 });
 

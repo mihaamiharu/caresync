@@ -34,7 +34,7 @@ test.describe("User Profile Management", () => {
     );
     expect(response.ok()).toBeTruthy();
     const newUser = await response.json();
-    cleanup.addUser(newUser.id);
+    cleanup.addUser(newUser.user?.id ?? newUser.id);
 
     // Login and navigate to profile
     await loginPage.goto();
