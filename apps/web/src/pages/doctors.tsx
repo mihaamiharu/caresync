@@ -93,10 +93,28 @@ function DoctorFormModal({ doctor, onClose, onSaved }: DoctorFormModalProps) {
       onSaved();
       onClose();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })
-        ?.response?.data?.message;
-      setServerError(msg ?? "Something went wrong. Please try again.");
+      const axiosError = err as {
+        response?: {
+          data?: {
+            message?: string;
+            errors?: Record<string, { _errors: string[] }>;
+          };
+        };
+      };
+      const data = axiosError.response?.data;
+      if (data?.message) {
+        setServerError(data.message);
+      } else if (data?.errors) {
+        // Flatten Zod-style errors from Hono OpenAPI
+        const errorMsgs = Object.entries(data.errors)
+          .map(([field, error]) => `${field}: ${error._errors?.join(", ")}`)
+          .join(" | ");
+        setServerError(errorMsgs || "Validation failed");
+      } else {
+        setServerError("Something went wrong. Please try again.");
+      }
     }
+
   };
 
   return (
