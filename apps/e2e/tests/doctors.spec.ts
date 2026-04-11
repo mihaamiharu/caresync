@@ -110,12 +110,17 @@ test.describe("Doctors — admin CRUD", () => {
     await doctorsPage.goto();
     await doctorsPage.isLoaded();
     await doctorsPage.createButton.click();
+    
+    // Wait for the department to be available in the select
+    await expect(page.locator(`select[data-testid="doctor-department-input"] option[value="${doctorData.departmentId}"]`)).toBeAttached();
+
     await doctorsPage.fillAndSubmitForm(doctorData);
 
     // Modal closes and new card appears
     if (await doctorsPage.formModal.isVisible()) {
-      const error = await doctorsPage.formError.innerText().catch(() => "No visible error");
-      console.error(`Form submission failed with error: ${error}`);
+      const serverError = await doctorsPage.formError.innerText().catch(() => null);
+      const fieldErrors = await page.locator('.text-destructive').allInnerTexts();
+      console.error(`Form submission failed. Server Error: ${serverError || 'None'}. Field Errors: ${fieldErrors.join(', ')}`);
     }
     
     await expect(doctorsPage.formModal).not.toBeVisible();
