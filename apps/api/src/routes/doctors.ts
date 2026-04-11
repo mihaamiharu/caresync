@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq, ilike, or, sql, and, asc } from "drizzle-orm";
 import { db } from "../db";
-import { users, doctors, departments } from "../db/schema";
+import { users, doctors, departments, appointments, medicalRecords } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { hashPassword } from "../lib/password";
 import type { AppEnv } from "../app";
@@ -80,6 +80,9 @@ doctorsRoute.openapi(listDoctorsRoute, async (c) => {
   const offset = (page - 1) * limit;
 
   const conditions = [];
+  // Filter for active users only by default
+  conditions.push(eq(users.isActive, true));
+
   if (departmentId) {
     conditions.push(eq(doctors.departmentId, departmentId));
   }
@@ -400,13 +403,18 @@ doctorsRoute.openapi(updateDoctorRoute, async (c) => {
       }
 
       // Update doctor info
+      const updateData: Partial<typeof doctors.$inferInsert> = {};
+      if (body.bio !== undefined) updateData.bio = body.bio;
+      
+      // Only admins can change department or specialization
+      if (authUserRole === "admin") {
+        if (body.specialization) updateData.specialization = body.specialization;
+        if (body.departmentId) updateData.departmentId = body.departmentId;
+      }
+
       const [updatedDoctor] = await tx
         .update(doctors)
-        .set({
-          specialization: body.specialization,
-          bio: body.bio !== undefined ? body.bio : undefined,
-          departmentId: body.departmentId,
-        })
+        .set(updateData)
         .where(eq(doctors.id, id))
         .returning();
 
@@ -498,15 +506,39 @@ doctorsRoute.openapi(deleteDoctorRoute, async (c) => {
     return c.json({ message: "Doctor not found" }, 404);
   }
 
+  // Check for active records (appointments or medical records)
+  const [existingAppointment] = await db
+    .select({ id: appointments.id })
+    .from(appointments)
+    .where(eq(appointments.doctorId, id))
+    .limit(1);
+
+  if (existingAppointment) {
+    return c.json({ message: "Cannot delete doctor with existing appointments. Deactivate them instead." }, 400);
+  }
+
+  const [existingRecord] = await db
+    .select({ id: medicalRecords.id })
+    .from(medicalRecords)
+    .where(eq(medicalRecords.doctorId, id))
+    .limit(1);
+
+  if (existingRecord) {
+    return c.json({ message: "Cannot delete doctor with medical records. Deactivate them instead." }, 400);
+  }
+
   try {
     await db.transaction(async (tx) => {
-      // Deleting the user will cascade delete the doctor profile due to onDelete: "cascade" in schema
-      await tx.delete(users).where(eq(users.id, doctor.userId));
+      // Soft delete: set user to inactive
+      await tx
+        .update(users)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(users.id, doctor.userId));
     });
 
-    return c.json({ message: "Doctor deleted successfully" }, 200);
+    return c.json({ message: "Doctor deactivated successfully" }, 200);
   } catch (error) {
-    console.error("Failed to delete doctor:", error);
-    return c.json({ message: "Failed to delete doctor" }, 500);
+    console.error("Failed to deactivate doctor:", error);
+    return c.json({ message: "Failed to deactivate doctor" }, 500);
   }
 });

@@ -46,8 +46,8 @@ function makeSelectChain(result: unknown[]) {
   const where = vi.fn().mockReturnValue({ limit });
   const innerJoin = vi
     .fn()
-    .mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where, limit }) });
-  const from = vi.fn().mockReturnValue({ innerJoin });
+    .mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where, limit }), where, limit });
+  const from = vi.fn().mockReturnValue({ innerJoin, where, limit });
   return { from };
 }
 
@@ -175,21 +175,9 @@ describe("POST /doctors", () => {
     });
 
     // 1. Check existing user
-    vi.mocked(db.select).mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi
-          .fn()
-          .mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
-      }),
-    } as any);
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]) as any);
     // 2. Check existing doctor (license)
-    vi.mocked(db.select).mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi
-          .fn()
-          .mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
-      }),
-    } as any);
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]) as any);
 
     // 3. Insert user
     vi.mocked(db.insert).mockReturnValueOnce(
@@ -239,13 +227,7 @@ describe("PUT /doctors/:id", () => {
   });
 
   it("returns 403 if not admin and not the same doctor", async () => {
-    vi.mocked(db.select).mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([mockDoctor]),
-        }),
-      }),
-    } as any);
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([mockDoctor]) as any);
 
     const token = signAccessToken({
       userId: "00000000-0000-0000-0000-000000000888",
@@ -264,13 +246,7 @@ describe("PUT /doctors/:id", () => {
   });
 
   it("returns 200 and updates for admin", async () => {
-    vi.mocked(db.select).mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([mockDoctor]),
-        }),
-      }),
-    } as any);
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([mockDoctor]) as any);
     vi.mocked(db.update).mockReturnValueOnce(makeUpdateChain([]) as any); // user update
     vi.mocked(db.update).mockReturnValueOnce(
       makeUpdateChain([{ ...mockDoctor, specialization: "Updated" }]) as any
@@ -346,28 +322,8 @@ describe("DELETE /doctors/:id", () => {
 
   it("returns 400 if doctor has appointments", async () => {
     vi.mocked(db.select)
-      .mockReturnValueOnce({
-        from: vi
-          .fn()
-          .mockReturnValue({
-            where: vi
-              .fn()
-              .mockReturnValue({
-                limit: vi.fn().mockResolvedValue([mockDoctor]),
-              }),
-          }),
-      } as any) // find doctor
-      .mockReturnValueOnce({
-        from: vi
-          .fn()
-          .mockReturnValue({
-            where: vi
-              .fn()
-              .mockReturnValue({
-                limit: vi.fn().mockResolvedValue([{ id: "appt-1" }]),
-              }),
-          }),
-      } as any); // find appointment
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(makeSelectChain([{ id: "appt-1" }]) as any); // find appointment
 
     const token = signAccessToken({ userId: "admin-999", role: "admin" });
     const res = await app.request(`${BASE}/${mockDoctor.id}`, {
@@ -382,35 +338,9 @@ describe("DELETE /doctors/:id", () => {
 
   it("returns 200 and deactivates user (soft delete) if no records", async () => {
     vi.mocked(db.select)
-      .mockReturnValueOnce({
-        from: vi
-          .fn()
-          .mockReturnValue({
-            where: vi
-              .fn()
-              .mockReturnValue({
-                limit: vi.fn().mockResolvedValue([mockDoctor]),
-              }),
-          }),
-      } as any) // find doctor
-      .mockReturnValueOnce({
-        from: vi
-          .fn()
-          .mockReturnValue({
-            where: vi
-              .fn()
-              .mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
-          }),
-      } as any) // no appointments
-      .mockReturnValueOnce({
-        from: vi
-          .fn()
-          .mockReturnValue({
-            where: vi
-              .fn()
-              .mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
-          }),
-      } as any); // no records
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // find doctor
+      .mockReturnValueOnce(makeSelectChain([]) as any) // no appointments
+      .mockReturnValueOnce(makeSelectChain([]) as any); // no records
 
     vi.mocked(db.update).mockReturnValueOnce(
       makeUpdateChain([{ ...mockDoctor.user, isActive: false }]) as any
