@@ -113,6 +113,11 @@ test.describe("Doctors — admin CRUD", () => {
     await doctorsPage.fillAndSubmitForm(doctorData);
 
     // Modal closes and new card appears
+    if (await doctorsPage.formModal.isVisible()) {
+      const error = await doctorsPage.formError.innerText().catch(() => "No visible error");
+      console.error(`Form submission failed with error: ${error}`);
+    }
+    
     await expect(doctorsPage.formModal).not.toBeVisible();
     await expect(
       page.getByText(`Dr. ${doctorData.firstName} ${doctorData.lastName}`)

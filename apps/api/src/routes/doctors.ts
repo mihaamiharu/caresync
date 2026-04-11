@@ -412,11 +412,12 @@ doctorsRoute.openapi(updateDoctorRoute, async (c) => {
         if (body.departmentId) updateData.departmentId = body.departmentId;
       }
 
-      const [updatedDoctor] = await tx
-        .update(doctors)
-        .set(updateData)
-        .where(eq(doctors.id, id))
-        .returning();
+      if (Object.keys(updateData).length > 0) {
+        await tx
+          .update(doctors)
+          .set(updateData)
+          .where(eq(doctors.id, id));
+      }
 
       // Fetch full updated doctor with user and department
       const [fullDoctor] = await tx
@@ -473,6 +474,10 @@ const deleteDoctorRoute = createRoute({
       content: {
         "application/json": { schema: z.object({ message: z.string() }) },
       },
+    },
+    400: {
+      description: "Bad request (e.g. has active records)",
+      content: { "application/json": { schema: errorResponse } },
     },
     401: {
       description: "Not authenticated",
