@@ -10,7 +10,7 @@ import type { Doctor, Department } from "@caresync/shared";
 // ─── Form schema ───────────────────────────────────────────────────────────────
 
 const doctorFormSchema = z.object({
-  email: z.string().email("Invalid email").min(1, "Email is required"),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
   password: z
     .string()
     .min(6, "Password must be at least 6 characters")
@@ -22,7 +22,7 @@ const doctorFormSchema = z.object({
   departmentId: z.string().uuid("Please select a department"),
   specialization: z.string().min(1, "Specialization is required"),
   bio: z.string().optional(),
-  licenseNumber: z.string().min(1, "License number is required"),
+  licenseNumber: z.string().optional(),
 });
 
 type DoctorFormInput = z.infer<typeof doctorFormSchema>;
@@ -79,13 +79,23 @@ function DoctorFormModal({ doctor, onClose, onSaved }: DoctorFormModalProps) {
           bio: data.bio || null,
         });
       } else {
+        if (!data.email) {
+          setServerError("Email is required for new doctors");
+          return;
+        }
         if (!data.password) {
           setServerError("Password is required for new doctors");
           return;
         }
+        if (!data.licenseNumber) {
+          setServerError("License number is required for new doctors");
+          return;
+        }
         await doctorsApi.createDoctor({
           ...data,
+          email: data.email,
           password: data.password,
+          licenseNumber: data.licenseNumber,
           phone: data.phone || null,
           bio: data.bio || null,
         } as any);

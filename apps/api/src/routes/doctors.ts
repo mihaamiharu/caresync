@@ -72,6 +72,14 @@ const listDoctorsRoute = createRoute({
       description: "Paginated doctor list",
       content: { "application/json": { schema: paginatedDoctorsResponse } },
     },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    500: {
+      description: "Internal server error",
+      content: { "application/json": { schema: errorResponse } },
+    },
   },
 });
 
@@ -159,8 +167,16 @@ const getDoctorRoute = createRoute({
       description: "Doctor details",
       content: { "application/json": { schema: doctorResponse } },
     },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
     404: {
       description: "Doctor not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    500: {
+      description: "Internal server error",
       content: { "application/json": { schema: errorResponse } },
     },
   },
