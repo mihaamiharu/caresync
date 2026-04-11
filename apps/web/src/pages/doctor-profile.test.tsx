@@ -194,6 +194,16 @@ describe("DoctorScheduleForm — behaviour", () => {
       "Conflict with appointments"
     );
   });
+
+  it("shows a load error when getSchedule fails", async () => {
+    vi.mocked(schedulesApi.getSchedule).mockRejectedValue(
+      new Error("Network error")
+    );
+    renderPage();
+    expect(
+      await screen.findByTestId("schedule-load-error")
+    ).toBeInTheDocument();
+  });
 });
 
 // ─── Slot viewer ──────────────────────────────────────────────────────────────
@@ -224,6 +234,20 @@ describe("DoctorAvailabilityViewer", () => {
     fireEvent.change(datePicker, { target: { value: "2026-05-05" } });
 
     expect(await screen.findByTestId("slot-empty")).toBeInTheDocument();
+  });
+
+  it("shows a fetch error (not empty state) when getAvailableSlots fails", async () => {
+    vi.mocked(schedulesApi.getAvailableSlots).mockRejectedValue(
+      new Error("500")
+    );
+    renderPage();
+    await screen.findByTestId("doctor-profile-page");
+
+    const datePicker = screen.getByTestId("slot-date-picker");
+    fireEvent.change(datePicker, { target: { value: "2026-05-05" } });
+
+    expect(await screen.findByTestId("slot-fetch-error")).toBeInTheDocument();
+    expect(screen.queryByTestId("slot-empty")).not.toBeInTheDocument();
   });
 
   it("displays available slots as UTC+7 times", async () => {

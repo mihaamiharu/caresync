@@ -42,30 +42,38 @@ function makeInitialDays(): Record<DayKey, DayConfig> {
 function DoctorScheduleForm({ doctorId }: { doctorId: string }) {
   const [slotDuration, setSlotDuration] = useState(30);
   const [days, setDays] = useState<Record<DayKey, DayConfig>>(makeInitialDays);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load existing schedule on mount
   useEffect(() => {
-    schedulesApi.getSchedule(doctorId).then((schedule: DoctorSchedule[]) => {
-      if (schedule.length === 0) return;
-      setDays((prev) => {
-        const next = { ...prev };
-        for (const row of schedule) {
-          const key = row.dayOfWeek as DayKey;
-          if (next[key]) {
-            next[key] = {
-              enabled: true,
-              startTime: row.startTime,
-              endTime: row.endTime,
-            };
+    schedulesApi
+      .getSchedule(doctorId)
+      .then((schedule: DoctorSchedule[]) => {
+        if (schedule.length === 0) return;
+        setDays((prev) => {
+          const next = { ...prev };
+          for (const row of schedule) {
+            const key = row.dayOfWeek as DayKey;
+            if (next[key]) {
+              next[key] = {
+                enabled: true,
+                startTime: row.startTime,
+                endTime: row.endTime,
+              };
+            }
           }
-        }
-        return next;
+          return next;
+        });
+        setSlotDuration(schedule[0].slotDurationMinutes);
+      })
+      .catch(() => {
+        setLoadError(
+          "Failed to load your schedule. Please refresh and try again."
+        );
       });
-      setSlotDuration(schedule[0].slotDurationMinutes);
-    });
   }, [doctorId]);
 
   const toggleDay = (key: DayKey) => {
@@ -120,6 +128,14 @@ function DoctorScheduleForm({ doctorId }: { doctorId: string }) {
       onSubmit={handleSubmit}
       className="space-y-4"
     >
+      {loadError && (
+        <p
+          data-testid="schedule-load-error"
+          className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {loadError}
+        </p>
+      )}
       {success && (
         <p
           data-testid="schedule-success"
@@ -221,10 +237,12 @@ function DoctorAvailabilityViewer({ doctorId }: { doctorId: string }) {
   const [slots, setSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
+  const [slotError, setSlotError] = useState<string | null>(null);
 
   const fetchSlots = (d: string) => {
     setLoading(true);
     setFetched(false);
+    setSlotError(null);
     schedulesApi
       .getAvailableSlots(doctorId, d)
       .then((result) => {
@@ -232,6 +250,7 @@ function DoctorAvailabilityViewer({ doctorId }: { doctorId: string }) {
       })
       .catch(() => {
         setSlots([]);
+        setSlotError("Failed to load available slots. Please try again.");
       })
       .finally(() => {
         setLoading(false);
@@ -258,7 +277,16 @@ function DoctorAvailabilityViewer({ doctorId }: { doctorId: string }) {
         </p>
       )}
 
-      {fetched && !loading && slots.length === 0 && (
+      {fetched && !loading && slotError && (
+        <p
+          data-testid="slot-fetch-error"
+          className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {slotError}
+        </p>
+      )}
+
+      {fetched && !loading && !slotError && slots.length === 0 && (
         <p
           data-testid="slot-empty"
           className="text-sm text-muted-foreground italic"
@@ -267,7 +295,7 @@ function DoctorAvailabilityViewer({ doctorId }: { doctorId: string }) {
         </p>
       )}
 
-      {fetched && !loading && slots.length > 0 && (
+      {fetched && !loading && !slotError && slots.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {slots.map((iso) => (
             <button
