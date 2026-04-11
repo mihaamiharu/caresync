@@ -6,6 +6,7 @@ import type {
   User,
   Department,
   Doctor,
+  DoctorSchedule,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -233,5 +234,41 @@ export const doctorsApi = {
 
   deleteDoctor: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/v1/doctors/${id}`);
+  },
+};
+
+interface PutScheduleInput {
+  slotDurationMinutes: number;
+  days: Array<{ dayOfWeek: string; startTime: string; endTime: string }>;
+}
+
+export const schedulesApi = {
+  getSchedule: async (doctorId: string): Promise<DoctorSchedule[]> => {
+    const res = await apiClient.get<DoctorSchedule[]>(
+      `/api/v1/doctors/${doctorId}/schedules`
+    );
+    return res.data;
+  },
+
+  putSchedule: async (
+    doctorId: string,
+    data: PutScheduleInput
+  ): Promise<DoctorSchedule[]> => {
+    const res = await apiClient.put<DoctorSchedule[]>(
+      `/api/v1/doctors/${doctorId}/schedules`,
+      data
+    );
+    return res.data;
+  },
+
+  getAvailableSlots: async (
+    doctorId: string,
+    date: string
+  ): Promise<string[]> => {
+    const res = await apiClient.get<string[]>(
+      `/api/v1/doctors/${doctorId}/available-slots`,
+      { params: { date } }
+    );
+    return res.data;
   },
 };
