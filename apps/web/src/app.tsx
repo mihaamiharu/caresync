@@ -7,6 +7,7 @@ import { ProfilePage } from "@/pages/profile";
 import { DepartmentsPage } from "@/pages/departments";
 import { DoctorsPage } from "@/pages/doctors";
 import { DoctorProfilePage } from "@/pages/doctor-profile";
+import { PatientsPage } from "@/pages/patients";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 
 export function App() {
@@ -22,6 +23,7 @@ export function App() {
           <Route path="/departments" element={<DepartmentsPage />} />
           <Route path="/doctors" element={<DoctorsPage />} />
           <Route path="/doctors/:id" element={<DoctorProfilePage />} />
+          <Route path="/patients" element={<PatientsPage />} />
           {/* Additional routes will be added per task */}
         </Route>
       </Route>

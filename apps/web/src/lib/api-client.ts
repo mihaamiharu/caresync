@@ -268,12 +268,11 @@ export const patientsApi = {
 
   listPatients: async (
     params?: ListPatientsParams
-  ): Promise<
-    PaginatedResponse<
-      Patient & { user: Pick<User, "id" | "email" | "firstName" | "lastName"> }
-    >
-  > => {
-    const res = await apiClient.get("/api/v1/patients", { params });
+  ): Promise<PaginatedResponse<Patient>> => {
+    const res = await apiClient.get<PaginatedResponse<Patient>>(
+      "/api/v1/patients",
+      { params }
+    );
     return res.data;
   },
 };
