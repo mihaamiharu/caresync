@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq } from "drizzle-orm";
+import { eq, ilike, or, sql, and } from "drizzle-orm";
 import { db } from "../db";
-import { patients } from "../db/schema";
+import { patients, users } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { BLOOD_TYPES, GENDERS } from "@caresync/shared";
 import type { AppEnv } from "../app";
@@ -152,4 +152,122 @@ patientsRoute.openapi(upsertPatientRoute, async (c) => {
     .returning();
 
   return c.json(inserted, 200);
+});
+
+// ─── GET /patients (admin list) ───────────────────────────────────────────────
+
+const listPatientsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1).openapi({ example: 1 }),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(20)
+    .openapi({ example: 20 }),
+  search: z.string().optional().openapi({ example: "john" }),
+  gender: z.enum(GENDERS).optional().openapi({ example: "male" }),
+  bloodType: z.enum(BLOOD_TYPES).optional().openapi({ example: "A+" }),
+});
+
+const patientListItem = z.object({
+  id: z.string(),
+  userId: z.string(),
+  dateOfBirth: z.string().nullable(),
+  gender: z.string().nullable(),
+  bloodType: z.string().nullable(),
+  user: z.object({
+    id: z.string(),
+    email: z.string(),
+    firstName: z.string(),
+    lastName: z.string(),
+  }),
+});
+
+const paginatedPatientsResponse = z.object({
+  data: z.array(patientListItem),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
+const listPatientsRoute = createRoute({
+  method: "get",
+  path: "/patients",
+  tags: ["Patients"],
+  summary: "List all patients with search and filters (admin only)",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireAuth, requireRole("admin")] as const,
+  request: { query: listPatientsQuerySchema },
+  responses: {
+    200: {
+      description: "Paginated patient list",
+      content: { "application/json": { schema: paginatedPatientsResponse } },
+    },
+    400: {
+      description: "Validation error",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Insufficient permissions",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+patientsRoute.openapi(listPatientsRoute, async (c) => {
+  const { page, limit, search, gender, bloodType } = c.req.valid("query");
+  const offset = (page - 1) * limit;
+
+  const conditions = [];
+  if (search) {
+    conditions.push(
+      or(
+        ilike(users.firstName, `%${search}%`),
+        ilike(users.lastName, `%${search}%`),
+        ilike(users.email, `%${search}%`)
+      )
+    );
+  }
+  if (gender) conditions.push(eq(patients.gender, gender));
+  if (bloodType) conditions.push(eq(patients.bloodType, bloodType));
+
+  const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(patients)
+    .innerJoin(users, eq(patients.userId, users.id))
+    .where(whereCondition);
+
+  const rows = await db
+    .select({
+      id: patients.id,
+      userId: patients.userId,
+      dateOfBirth: patients.dateOfBirth,
+      gender: patients.gender,
+      bloodType: patients.bloodType,
+      user: {
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      },
+    })
+    .from(patients)
+    .innerJoin(users, eq(patients.userId, users.id))
+    .where(whereCondition)
+    .orderBy(users.lastName)
+    .offset(offset)
+    .limit(limit);
+
+  return c.json(
+    { data: rows, total, page, limit, totalPages: Math.ceil(total / limit) },
+    200
+  );
 });

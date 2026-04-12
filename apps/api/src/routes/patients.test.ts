@@ -232,3 +232,107 @@ describe("PUT /patients/me", () => {
     expect(res.status).toBe(200);
   });
 });
+
+// ─── GET /patients (admin list) ───────────────────────────────────────────────
+
+const PATIENTS_URL = "/api/v1/patients";
+const doctorToken = signAccessToken({
+  userId: "doctor-uuid-001",
+  role: "doctor",
+});
+
+const mockPatientWithUser = {
+  ...mockPatient,
+  user: {
+    id: "user-uuid-123",
+    email: "patient@example.com",
+    firstName: "John",
+    lastName: "Doe",
+  },
+};
+
+function makeJoinCountChain(total: number) {
+  const where = vi.fn().mockResolvedValue([{ total }]);
+  const innerJoin = vi.fn().mockReturnValue({ where });
+  const from = vi.fn().mockReturnValue({ innerJoin });
+  return { from };
+}
+
+function makeJoinListChain(result: unknown[]) {
+  const limit = vi.fn().mockResolvedValue(result);
+  const offset = vi.fn().mockReturnValue({ limit });
+  const orderBy = vi.fn().mockReturnValue({ offset });
+  const where = vi.fn().mockReturnValue({ orderBy });
+  const innerJoin = vi.fn().mockReturnValue({ where });
+  const from = vi.fn().mockReturnValue({ innerJoin });
+  return { from };
+}
+
+describe("GET /patients", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns 401 when no Authorization header is provided", async () => {
+    const res = await app.request(PATIENTS_URL);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by a non-admin role", async () => {
+    const res = await app.request(PATIENTS_URL, {
+      headers: bearer(patientToken),
+    });
+    expect(res.status).toBe(403);
+
+    const res2 = await app.request(PATIENTS_URL, {
+      headers: bearer(doctorToken),
+    });
+    expect(res2.status).toBe(403);
+  });
+
+  it("returns a paginated list for admin", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinCountChain(1) as any)
+      .mockReturnValueOnce(makeJoinListChain([mockPatientWithUser]) as any);
+
+    const res = await app.request(PATIENTS_URL, {
+      headers: bearer(adminToken),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.total).toBe(1);
+    expect(body.page).toBe(1);
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].id).toBe("patient-uuid-123");
+    expect(body.data[0].user.email).toBe("patient@example.com");
+  });
+
+  it("accepts search, gender, and bloodType query params without error", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinCountChain(0) as any)
+      .mockReturnValueOnce(makeJoinListChain([]) as any);
+
+    const res = await app.request(
+      `${PATIENTS_URL}?search=john&gender=male&bloodType=A%2B&page=1&limit=10`,
+      { headers: bearer(adminToken) }
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.total).toBe(0);
+    expect(body.data).toHaveLength(0);
+  });
+
+  it("returns 400 for an invalid gender filter", async () => {
+    const res = await app.request(`${PATIENTS_URL}?gender=unknown`, {
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an invalid bloodType filter", async () => {
+    const res = await app.request(`${PATIENTS_URL}?bloodType=X%2B`, {
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(400);
+  });
+});
