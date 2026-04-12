@@ -7,6 +7,7 @@ import type {
   Department,
   Doctor,
   DoctorSchedule,
+  Patient,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -234,6 +235,46 @@ export const doctorsApi = {
 
   deleteDoctor: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/v1/doctors/${id}`);
+  },
+};
+
+interface UpsertPatientInput {
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  bloodType?: string | null;
+  allergies?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+}
+
+interface ListPatientsParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  gender?: string;
+  bloodType?: string;
+}
+
+export const patientsApi = {
+  getPatient: async (): Promise<Patient | null> => {
+    const res = await apiClient.get<Patient | null>("/api/v1/patients/me");
+    return res.data;
+  },
+
+  upsertPatient: async (data: UpsertPatientInput): Promise<Patient> => {
+    const res = await apiClient.put<Patient>("/api/v1/patients/me", data);
+    return res.data;
+  },
+
+  listPatients: async (
+    params?: ListPatientsParams
+  ): Promise<
+    PaginatedResponse<
+      Patient & { user: Pick<User, "id" | "email" | "firstName" | "lastName"> }
+    >
+  > => {
+    const res = await apiClient.get("/api/v1/patients", { params });
+    return res.data;
   },
 };
 
