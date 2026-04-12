@@ -2,6 +2,7 @@ import { NavLink } from "react-router";
 import {
   LayoutDashboard,
   Calendar,
+  CalendarPlus,
   Stethoscope,
   Users,
   FileText,
@@ -20,6 +21,12 @@ import { useNavigate } from "react-router";
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
   { to: "/appointments", label: "Appointments", icon: Calendar, roles: null },
+  {
+    to: "/appointments/book",
+    label: "Book Appointment",
+    icon: CalendarPlus,
+    roles: ["patient"],
+  },
   { to: "/doctors", label: "Doctors", icon: Stethoscope, roles: null },
   { to: "/patients", label: "Patients", icon: Users, roles: ["admin"] },
   {

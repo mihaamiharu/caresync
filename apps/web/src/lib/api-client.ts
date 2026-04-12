@@ -8,6 +8,8 @@ import type {
   Doctor,
   DoctorSchedule,
   Patient,
+  Appointment,
+  AppointmentType,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -273,6 +275,22 @@ export const patientsApi = {
       "/api/v1/patients",
       { params }
     );
+    return res.data;
+  },
+};
+
+export interface CreateAppointmentInput {
+  doctorId: string;
+  appointmentDate: string;
+  startTime: string;
+  type: AppointmentType;
+  reason?: string;
+  notes?: string;
+}
+
+export const appointmentsApi = {
+  create: async (data: CreateAppointmentInput): Promise<Appointment> => {
+    const res = await apiClient.post<Appointment>("/api/v1/appointments", data);
     return res.data;
   },
 };

@@ -8,7 +8,15 @@ import { DepartmentsPage } from "@/pages/departments";
 import { DoctorsPage } from "@/pages/doctors";
 import { DoctorProfilePage } from "@/pages/doctor-profile";
 import { PatientsPage } from "@/pages/patients";
+import { BookAppointmentPage } from "@/pages/book-appointment";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { useAuthStore } from "@/stores/auth-store";
+
+function PatientOnlyRoute() {
+  const user = useAuthStore((s) => s.user);
+  if (user?.role !== "patient") return <Navigate to="/dashboard" replace />;
+  return <BookAppointmentPage />;
+}
 
 export function App() {
   return (
@@ -24,6 +32,7 @@ export function App() {
           <Route path="/doctors" element={<DoctorsPage />} />
           <Route path="/doctors/:id" element={<DoctorProfilePage />} />
           <Route path="/patients" element={<PatientsPage />} />
+          <Route path="/appointments/book" element={<PatientOnlyRoute />} />
           {/* Additional routes will be added per task */}
         </Route>
       </Route>
