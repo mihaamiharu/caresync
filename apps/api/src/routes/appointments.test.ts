@@ -197,7 +197,8 @@ describe("POST /appointments", () => {
     vi.mocked(computeAvailableSlots).mockResolvedValue([]); // no slots
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([mockPatient]) as any)
-      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any);
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(makeSelectChain([]) as any); // no existing appointment
 
     const res = await app.request(APPOINTMENTS_URL, {
       method: "POST",
@@ -213,14 +214,7 @@ describe("POST /appointments", () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([mockPatient]) as any)
       .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
-      .mockReturnValueOnce(makeSelectChain([mockSchedule]) as any);
-
-    const uniqueError = Object.assign(new Error("unique violation"), {
-      code: "23505",
-    });
-    const returning = vi.fn().mockRejectedValue(uniqueError);
-    const values = vi.fn().mockReturnValue({ returning });
-    vi.mocked(db.insert).mockReturnValueOnce({ values } as any);
+      .mockReturnValueOnce(makeSelectChain([{ id: APPT_ID }]) as any); // existing appt found
 
     const res = await app.request(APPOINTMENTS_URL, {
       method: "POST",
@@ -236,6 +230,7 @@ describe("POST /appointments", () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([mockPatient]) as any)
       .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(makeSelectChain([]) as any) // no existing appointment
       .mockReturnValueOnce(makeSelectChain([mockSchedule]) as any);
 
     vi.mocked(db.insert).mockReturnValueOnce(
@@ -259,6 +254,7 @@ describe("POST /appointments", () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([]) as any) // patient not found
       .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(makeSelectChain([]) as any) // no existing appointment
       .mockReturnValueOnce(makeSelectChain([mockSchedule]) as any);
 
     vi.mocked(db.insert)
@@ -279,6 +275,7 @@ describe("POST /appointments", () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([mockPatient]) as any)
       .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(makeSelectChain([]) as any) // no existing appointment
       .mockReturnValueOnce(makeSelectChain([mockSchedule]) as any);
 
     vi.mocked(db.insert).mockReturnValueOnce(

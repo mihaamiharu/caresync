@@ -145,12 +145,36 @@ appointmentsRoute.openapi(createAppointmentRoute, async (c) => {
   }
 
   // 4. Validate the requested slot is currently available
+  const normalizedStartTime = new Date(startTime).toISOString();
+  const startDate = new Date(normalizedStartTime);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const startUtcTime = `${pad(startDate.getUTCHours())}:${pad(startDate.getUTCMinutes())}`;
+
+  // Check for an existing appointment at the same slot first (→ 409, not 400)
+  const [existingAppt] = await db
+    .select({ id: appointments.id })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.doctorId, doctorId),
+        eq(appointments.appointmentDate, appointmentDate),
+        eq(appointments.startTime, startUtcTime)
+      )
+    )
+    .limit(1);
+
+  if (existingAppt) {
+    return c.json(
+      { message: "This slot was just booked — please select another" },
+      409
+    );
+  }
+
   const availableSlots = await computeAvailableSlots(
     doctorId,
     appointmentDate,
     db
   );
-  const normalizedStartTime = new Date(startTime).toISOString();
   if (!availableSlots.includes(normalizedStartTime)) {
     return c.json({ message: "This time slot is not available" }, 400);
   }
@@ -171,11 +195,8 @@ appointmentsRoute.openapi(createAppointmentRoute, async (c) => {
     .limit(1);
 
   const slotDuration = scheduleRow?.slotDurationMinutes ?? 30;
-  const startDate = new Date(normalizedStartTime);
   const endDate = new Date(startDate.getTime() + slotDuration * 60 * 1000);
 
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const startUtcTime = `${pad(startDate.getUTCHours())}:${pad(startDate.getUTCMinutes())}`;
   const endUtcTime = `${pad(endDate.getUTCHours())}:${pad(endDate.getUTCMinutes())}`;
 
   // 6. Insert the appointment; catch unique slot conflict
