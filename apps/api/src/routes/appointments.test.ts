@@ -244,8 +244,10 @@ describe("POST /appointments", () => {
   });
 
   it("returns 400 for an appointmentDate more than 60 days out", async () => {
+    // Use +90 UTC days — always past the 60-day Jakarta window regardless of
+    // UTC/Jakarta day boundary (avoids off-by-one when CI runs after 17:00 UTC).
     const farFuture = new Date();
-    farFuture.setDate(farFuture.getDate() + 61);
+    farFuture.setDate(farFuture.getDate() + 90);
     const farFutureStr = farFuture.toISOString().substring(0, 10);
 
     const res = await app.request(APPOINTMENTS_URL, {

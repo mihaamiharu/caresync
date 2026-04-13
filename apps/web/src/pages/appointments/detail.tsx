@@ -232,7 +232,10 @@ export function AppointmentDetailPage() {
               label="Type"
               value={<span className="capitalize">{appointment.type}</span>}
             />
-            <DetailRow label="Status" value={<StatusBadge status={status} />} />
+            <DetailRow
+              label="Status"
+              value={<StatusBadge status={status} withTestId={false} />}
+            />
             <DetailRow label="Reason" value={appointment.reason} />
             <DetailRow label="Notes" value={appointment.notes} />
           </dl>

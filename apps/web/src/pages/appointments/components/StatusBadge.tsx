@@ -11,14 +11,15 @@ const STATUS_STYLES: Record<AppointmentStatus, string> = {
 
 interface StatusBadgeProps {
   status: AppointmentStatus;
+  withTestId?: boolean;
 }
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, withTestId = true }: StatusBadgeProps) {
   const styles = STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600";
   const label = status.charAt(0).toUpperCase() + status.slice(1);
   return (
     <span
-      data-testid={`status-badge-${status}`}
+      {...(withTestId ? { "data-testid": `status-badge-${status}` } : {})}
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles}`}
     >
       {label}

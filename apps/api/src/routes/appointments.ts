@@ -558,11 +558,11 @@ appointmentsRoute.openapi(createAppointmentRoute, async (c) => {
   const todayJakarta = new Date().toLocaleDateString("sv-SE", {
     timeZone: "Asia/Jakarta",
   });
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 60);
-  const maxDateJakarta = maxDate.toLocaleDateString("sv-SE", {
-    timeZone: "Asia/Jakarta",
-  });
+  // Derive max date from the Jakarta-local today so the +60 day arithmetic is
+  // never skewed by a UTC/Jakarta day boundary (happens between 17:00–00:00 UTC).
+  const maxDateObj = new Date(todayJakarta);
+  maxDateObj.setUTCDate(maxDateObj.getUTCDate() + 60);
+  const maxDateJakarta = maxDateObj.toISOString().substring(0, 10);
 
   if (appointmentDate < todayJakarta) {
     return c.json(
