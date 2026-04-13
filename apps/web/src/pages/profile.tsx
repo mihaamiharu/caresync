@@ -246,7 +246,7 @@ export function ProfilePage() {
         lastName: data.lastName,
         phone: data.phone || null,
       });
-      if (user && accessToken) {
+      if (updated && accessToken) {
         setAuth(updated, accessToken);
       }
       setSuccess(true);
@@ -265,7 +265,7 @@ export function ProfilePage() {
       const formData = new FormData();
       formData.append("avatar", file);
       const updated = await usersApi.updateAvatar(formData);
-      if (user && accessToken) {
+      if (updated && accessToken) {
         setAuth(updated, accessToken);
       }
     } catch (err: unknown) {
