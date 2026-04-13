@@ -186,6 +186,12 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
+    // Seed baseline mocks so the full ProfilePage tree is safe after resetAllMocks.
+    // Without these, an accidental profile-form submission would call
+    // updateProfile() → undefined → setAuth(undefined, token) → user cleared →
+    // MedicalInfoForm unmounts before setSuccess(true) fires.
+    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
+    vi.mocked(usersApi.updateProfile).mockResolvedValue(mockUser);
   });
 
   it("renders the Medical Information section for patients", async () => {
