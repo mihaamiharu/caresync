@@ -10,14 +10,11 @@ import {
   integer,
   decimal,
   pgEnum,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", [
-  "admin",
-  "doctor",
-  "patient",
-]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "doctor", "patient"]);
 export const appointmentStatusEnum = pgEnum("appointment_status", [
   "pending",
   "confirmed",
@@ -110,24 +107,34 @@ export const patients = pgTable("patients", {
   emergencyContactPhone: varchar("emergency_contact_phone", { length: 20 }),
 });
 
-export const appointments = pgTable("appointments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  patientId: uuid("patient_id")
-    .notNull()
-    .references(() => patients.id),
-  doctorId: uuid("doctor_id")
-    .notNull()
-    .references(() => doctors.id),
-  appointmentDate: date("appointment_date").notNull(),
-  startTime: time("start_time").notNull(),
-  endTime: time("end_time").notNull(),
-  status: appointmentStatusEnum("status").notNull().default("pending"),
-  type: appointmentTypeEnum("type").notNull().default("consultation"),
-  reason: text("reason"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const appointments = pgTable(
+  "appointments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id),
+    doctorId: uuid("doctor_id")
+      .notNull()
+      .references(() => doctors.id),
+    appointmentDate: date("appointment_date").notNull(),
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    status: appointmentStatusEnum("status").notNull().default("pending"),
+    type: appointmentTypeEnum("type").notNull().default("consultation"),
+    reason: text("reason"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    unique("uq_appointments_doctor_date_time").on(
+      table.doctorId,
+      table.appointmentDate,
+      table.startTime
+    ),
+  ]
+);
 
 export const medicalRecords = pgTable("medical_records", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -147,19 +154,16 @@ export const medicalRecords = pgTable("medical_records", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const medicalRecordAttachments = pgTable(
-  "medical_record_attachments",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    medicalRecordId: uuid("medical_record_id")
-      .notNull()
-      .references(() => medicalRecords.id, { onDelete: "cascade" }),
-    fileName: varchar("file_name", { length: 255 }).notNull(),
-    fileUrl: text("file_url").notNull(),
-    fileType: varchar("file_type", { length: 50 }).notNull(),
-    fileSize: integer("file_size").notNull(),
-  }
-);
+export const medicalRecordAttachments = pgTable("medical_record_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  medicalRecordId: uuid("medical_record_id")
+    .notNull()
+    .references(() => medicalRecords.id, { onDelete: "cascade" }),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: varchar("file_type", { length: 50 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+});
 
 export const prescriptions = pgTable("prescriptions", {
   id: uuid("id").primaryKey().defaultRandom(),

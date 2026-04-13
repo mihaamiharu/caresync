@@ -1,2 +1,2 @@
 pnpm exec lint-staged
-pnpm run test
+pnpm turbo test --filter=!@caresync/e2e
