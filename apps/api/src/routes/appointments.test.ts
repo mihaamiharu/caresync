@@ -101,6 +101,85 @@ const validBody = {
   reason: "Annual checkup",
 };
 
+// ─── Join-chain mock for complex SELECT queries ───────────────────────────────
+
+function makeJoinChain(result: unknown[]) {
+  const terminalChain: any = {
+    offset: vi.fn().mockResolvedValue(result),
+    then: (onFulfilled?: any, onRejected?: any) =>
+      Promise.resolve(result).then(onFulfilled, onRejected),
+    catch: (onRejected?: any) => Promise.resolve(result).catch(onRejected),
+    finally: (onFinally?: any) => Promise.resolve(result).finally(onFinally),
+  };
+  const chain: any = {};
+  for (const m of ["from", "innerJoin", "leftJoin", "where", "orderBy"]) {
+    chain[m] = vi.fn().mockReturnValue(chain);
+  }
+  chain.limit = vi.fn().mockReturnValue(terminalChain);
+  return chain;
+}
+
+const USER_DOCTOR_ID = "a1b2c3d4-0000-4000-8000-000000000006";
+
+const mockListRow = {
+  appointment: { ...mockAppointment },
+  patientFirstName: "John",
+  patientLastName: "Doe",
+  patientUserId: USER_PATIENT_ID,
+  doctorFirstName: "Jane",
+  doctorLastName: "Smith",
+  doctorUserId: USER_DOCTOR_ID,
+  doctorSpecialization: "Cardiology",
+};
+
+const mockDetailRow = {
+  appointment: { ...mockAppointment },
+  patient: {
+    id: PATIENT_ID,
+    userId: USER_PATIENT_ID,
+    dateOfBirth: null,
+    gender: null,
+    bloodType: null,
+    allergies: null,
+    emergencyContactName: null,
+    emergencyContactPhone: null,
+  },
+  patientUser: {
+    id: USER_PATIENT_ID,
+    email: "patient@test.com",
+    role: "patient",
+    firstName: "John",
+    lastName: "Doe",
+    phone: null,
+    avatarUrl: null,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    passwordHash: "hashed",
+  },
+  doctor: {
+    id: DOCTOR_ID,
+    userId: USER_DOCTOR_ID,
+    departmentId: "a1b2c3d4-0000-4000-8000-000000000020",
+    specialization: "Cardiology",
+    bio: null,
+    licenseNumber: "LIC-001",
+  },
+  doctorUser: {
+    id: USER_DOCTOR_ID,
+    email: "doctor@test.com",
+    role: "doctor",
+    firstName: "Jane",
+    lastName: "Smith",
+    phone: null,
+    avatarUrl: null,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    passwordHash: "hashed",
+  },
+};
+
 // ─── POST /appointments ───────────────────────────────────────────────────────
 
 describe("POST /appointments", () => {
@@ -291,5 +370,184 @@ describe("POST /appointments", () => {
       body: JSON.stringify(bodyNoReason),
     });
     expect(res.status).toBe(201);
+  });
+});
+
+// ─── GET /appointments ────────────────────────────────────────────────────────
+
+describe("GET /appointments", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns 401 when no Authorization header", async () => {
+    const res = await app.request(APPOINTMENTS_URL, { method: "GET" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 200 with paginated list for patient role", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([{ count: 1 }]) as any) // count
+      .mockReturnValueOnce(makeJoinChain([mockListRow]) as any); // data
+    const res = await app.request(APPOINTMENTS_URL, {
+      method: "GET",
+      headers: bearer(patientToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.total).toBe(1);
+    expect(body.page).toBe(1);
+    expect(body.totalPages).toBe(1);
+    expect(body.data[0].patientName).toBe("John Doe");
+    expect(body.data[0].doctorName).toBe("Jane Smith");
+    expect(body.data[0].doctorSpecialization).toBe("Cardiology");
+  });
+
+  it("returns 200 with paginated list for doctor role", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([{ count: 1 }]) as any)
+      .mockReturnValueOnce(makeJoinChain([mockListRow]) as any);
+    const res = await app.request(APPOINTMENTS_URL, {
+      method: "GET",
+      headers: bearer(doctorToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toHaveLength(1);
+  });
+
+  it("returns 200 with paginated list for admin role", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([{ count: 1 }]) as any)
+      .mockReturnValueOnce(makeJoinChain([mockListRow]) as any);
+    const res = await app.request(APPOINTMENTS_URL, {
+      method: "GET",
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toHaveLength(1);
+  });
+
+  it("returns empty data array when no appointments exist", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([{ count: 0 }]) as any)
+      .mockReturnValueOnce(makeJoinChain([]) as any);
+    const res = await app.request(`${APPOINTMENTS_URL}?status=confirmed`, {
+      method: "GET",
+      headers: bearer(patientToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toHaveLength(0);
+    expect(body.total).toBe(0);
+  });
+
+  it("respects custom page and limit params and computes totalPages", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([{ count: 25 }]) as any)
+      .mockReturnValueOnce(makeJoinChain([mockListRow]) as any);
+    const res = await app.request(`${APPOINTMENTS_URL}?page=2&limit=10`, {
+      method: "GET",
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.page).toBe(2);
+    expect(body.limit).toBe(10);
+    expect(body.totalPages).toBe(3);
+  });
+});
+
+// ─── GET /appointments/:id ────────────────────────────────────────────────────
+
+describe("GET /appointments/:id", () => {
+  const DETAIL_URL = `${APPOINTMENTS_URL}/${APPT_ID}`;
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns 401 when no Authorization header", async () => {
+    const res = await app.request(DETAIL_URL, { method: "GET" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when appointment does not exist", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([]) as any);
+    const res = await app.request(DETAIL_URL, {
+      method: "GET",
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when patient accesses another patient's appointment", async () => {
+    const foreign = {
+      ...mockDetailRow,
+      patient: { ...mockDetailRow.patient, userId: "different-user-id" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([foreign]) as any);
+    const res = await app.request(DETAIL_URL, {
+      method: "GET",
+      headers: bearer(patientToken),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when doctor accesses another doctor's appointment", async () => {
+    const foreign = {
+      ...mockDetailRow,
+      doctor: { ...mockDetailRow.doctor, userId: "different-doctor-id" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([foreign]) as any);
+    const res = await app.request(DETAIL_URL, {
+      method: "GET",
+      headers: bearer(doctorToken),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 200 with nested patient and doctor for own appointment (patient)", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([mockDetailRow]) as any
+    );
+    const res = await app.request(DETAIL_URL, {
+      method: "GET",
+      headers: bearer(patientToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toBe(APPT_ID);
+    expect(body.patient).toBeDefined();
+    expect(body.doctor).toBeDefined();
+    expect(body.patient.user).toBeDefined();
+    expect(body.doctor.user).toBeDefined();
+    expect(body.patient.user.passwordHash).toBeUndefined();
+    expect(body.doctor.user.passwordHash).toBeUndefined();
+  });
+
+  it("returns 200 for doctor accessing their own appointment", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([mockDetailRow]) as any
+    );
+    const res = await app.request(DETAIL_URL, {
+      method: "GET",
+      headers: bearer(doctorToken),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 200 for admin accessing any appointment", async () => {
+    const anyAppt = {
+      ...mockDetailRow,
+      patient: {
+        ...mockDetailRow.patient,
+        userId: "completely-different-user",
+      },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([anyAppt]) as any);
+    const res = await app.request(DETAIL_URL, {
+      method: "GET",
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(200);
   });
 });
