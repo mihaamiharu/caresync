@@ -139,8 +139,10 @@ describe("ProfilePage", () => {
   });
 
   it("disables the save button while submitting", async () => {
+    // Use a never-settling promise so isSubmitting stays true without
+    // leaving a real timer that fires setAuth(undefined) mid-test in CI.
     vi.mocked(usersApi.updateProfile).mockImplementation(
-      () => new Promise((resolve) => setTimeout(resolve, 500))
+      () => new Promise(() => {})
     );
     renderProfile();
 
