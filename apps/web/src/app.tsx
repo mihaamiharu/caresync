@@ -9,6 +9,8 @@ import { DoctorsPage } from "@/pages/doctors";
 import { DoctorProfilePage } from "@/pages/doctor-profile";
 import { PatientsPage } from "@/pages/patients";
 import { BookAppointmentPage } from "@/pages/book-appointment";
+import { AppointmentsPage } from "@/pages/appointments";
+import { AppointmentDetailPage } from "@/pages/appointments/detail";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -32,6 +34,8 @@ export function App() {
           <Route path="/doctors" element={<DoctorsPage />} />
           <Route path="/doctors/:id" element={<DoctorProfilePage />} />
           <Route path="/patients" element={<PatientsPage />} />
+          <Route path="/appointments" element={<AppointmentsPage />} />
+          <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
           <Route path="/appointments/book" element={<PatientOnlyRoute />} />
           {/* Additional routes will be added per task */}
         </Route>

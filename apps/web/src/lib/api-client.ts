@@ -288,9 +288,51 @@ export interface CreateAppointmentInput {
   notes?: string;
 }
 
+export interface AppointmentListItem extends Appointment {
+  patientName: string;
+  doctorName: string;
+  doctorSpecialization: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListAppointmentsParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  from?: string;
+  to?: string;
+}
+
 export const appointmentsApi = {
   create: async (data: CreateAppointmentInput): Promise<Appointment> => {
     const res = await apiClient.post<Appointment>("/api/v1/appointments", data);
+    return res.data;
+  },
+
+  list: async (
+    params?: ListAppointmentsParams
+  ): Promise<PaginatedResponse<AppointmentListItem>> => {
+    const res = await apiClient.get<PaginatedResponse<AppointmentListItem>>(
+      "/api/v1/appointments",
+      { params }
+    );
+    return res.data;
+  },
+
+  get: async (id: string): Promise<Appointment> => {
+    const res = await apiClient.get<Appointment>(`/api/v1/appointments/${id}`);
+    return res.data;
+  },
+
+  updateStatus: async (
+    id: string,
+    status: string
+  ): Promise<{ appointment: Appointment }> => {
+    const res = await apiClient.patch<{ appointment: Appointment }>(
+      `/api/v1/appointments/${id}/status`,
+      { status }
+    );
     return res.data;
   },
 };
