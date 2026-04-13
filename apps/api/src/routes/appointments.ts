@@ -293,6 +293,179 @@ appointmentsRoute.openapi(getAppointmentRoute, async (c) => {
   );
 });
 
+// ─── PATCH /appointments/:id/status ──────────────────────────────────────────
+
+// Valid next statuses for each current status
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["in-progress", "cancelled"],
+  "in-progress": ["completed", "cancelled"],
+  completed: [],
+  cancelled: [],
+  "no-show": [],
+};
+
+// What statuses each role may set (regardless of current status)
+const ROLE_ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  patient: ["cancelled"],
+  doctor: ["confirmed", "in-progress", "completed"],
+  admin: ["confirmed", "in-progress", "completed", "cancelled", "no-show"],
+};
+
+const patchStatusBody = z.object({ status: z.enum(APPOINTMENT_STATUSES) });
+
+const statusUpdateResponse = z.object({
+  appointment: appointmentDetailResponse,
+});
+
+const patchStatusRoute = createRoute({
+  method: "patch",
+  path: "/appointments/{id}/status",
+  tags: ["Appointments"],
+  summary: "Update appointment status",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireAuth] as const,
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: {
+      content: { "application/json": { schema: patchStatusBody } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      description: "Status updated",
+      content: { "application/json": { schema: statusUpdateResponse } },
+    },
+    400: {
+      description: "Validation error",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Forbidden",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    422: {
+      description: "Invalid status transition",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+appointmentsRoute.openapi(patchStatusRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const { status: newStatus } = c.req.valid("json");
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  const patientUser = alias(users, "patient_user");
+  const doctorUser = alias(users, "doctor_user");
+
+  // 1. Fetch appointment with ownership info
+  const rows = await db
+    .select({
+      appointment: appointments,
+      patient: patients,
+      patientUser: patientUser,
+      doctor: doctors,
+      doctorUser: doctorUser,
+    })
+    .from(appointments)
+    .innerJoin(patients, eq(appointments.patientId, patients.id))
+    .innerJoin(patientUser, eq(patients.userId, patientUser.id))
+    .innerJoin(doctors, eq(appointments.doctorId, doctors.id))
+    .innerJoin(doctorUser, eq(doctors.userId, doctorUser.id))
+    .where(eq(appointments.id, id))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return c.json({ message: "Appointment not found" }, 404);
+
+  // 2. Ownership check
+  if (userRole === "patient" && row.patient.userId !== userId) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+  if (userRole === "doctor" && row.doctor.userId !== userId) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
+  // 3. Role-based allowed transitions
+  const roleAllowed = ROLE_ALLOWED_TRANSITIONS[userRole] ?? [];
+  if (!roleAllowed.includes(newStatus)) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
+  // 4. Validate transition in matrix
+  const currentStatus = row.appointment.status;
+  const validNext = VALID_TRANSITIONS[currentStatus] ?? [];
+  if (!validNext.includes(newStatus)) {
+    return c.json(
+      { message: `Invalid status transition: ${currentStatus} → ${newStatus}` },
+      422
+    );
+  }
+
+  // 5. Apply the update
+  await db
+    .update(appointments)
+    .set({ status: newStatus, updatedAt: new Date() })
+    .where(eq(appointments.id, id))
+    .returning();
+
+  // 6. Re-fetch full detail
+  const updatedRows = await db
+    .select({
+      appointment: appointments,
+      patient: patients,
+      patientUser: patientUser,
+      doctor: doctors,
+      doctorUser: doctorUser,
+    })
+    .from(appointments)
+    .innerJoin(patients, eq(appointments.patientId, patients.id))
+    .innerJoin(patientUser, eq(patients.userId, patientUser.id))
+    .innerJoin(doctors, eq(appointments.doctorId, doctors.id))
+    .innerJoin(doctorUser, eq(doctors.userId, doctorUser.id))
+    .where(eq(appointments.id, id))
+    .limit(1);
+
+  const updated = updatedRows[0]!;
+
+  const {
+    passwordHash: _ph1,
+    createdAt: _pc,
+    updatedAt: _pu,
+    ...patientUserSafe
+  } = updated.patientUser;
+  const {
+    passwordHash: _ph2,
+    createdAt: _dc,
+    updatedAt: _du,
+    ...doctorUserSafe
+  } = updated.doctorUser;
+
+  return c.json(
+    {
+      appointment: {
+        ...updated.appointment,
+        createdAt: new Date(updated.appointment.createdAt).toISOString(),
+        updatedAt: new Date(updated.appointment.updatedAt).toISOString(),
+        patient: { ...updated.patient, user: patientUserSafe },
+        doctor: { ...updated.doctor, user: doctorUserSafe },
+      },
+    },
+    200
+  );
+});
+
 const DAY_NAMES = [
   "sunday",
   "monday",

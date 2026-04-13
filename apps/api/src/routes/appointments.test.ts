@@ -551,3 +551,187 @@ describe("GET /appointments/:id", () => {
     expect(res.status).toBe(200);
   });
 });
+
+// ─── PATCH /appointments/:id/status ──────────────────────────────────────────
+
+function makeUpdateChain(result: unknown[]) {
+  const returning = vi.fn().mockResolvedValue(result);
+  const where = vi.fn().mockReturnValue({ returning });
+  const set = vi.fn().mockReturnValue({ where });
+  return { set };
+}
+
+describe("PATCH /appointments/:id/status", () => {
+  const STATUS_URL = `${APPOINTMENTS_URL}/${APPT_ID}/status`;
+  const jsonH = { "Content-Type": "application/json" };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns 401 when no Authorization header", async () => {
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: jsonH,
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when appointment not found", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([]) as any);
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(adminToken) },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when patient tries to update another patient's appointment", async () => {
+    const foreign = {
+      ...mockDetailRow,
+      patient: { ...mockDetailRow.patient, userId: "different-user-id" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([foreign]) as any);
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(patientToken) },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when doctor tries to update another doctor's appointment", async () => {
+    const foreign = {
+      ...mockDetailRow,
+      doctor: { ...mockDetailRow.doctor, userId: "different-doctor-id" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([foreign]) as any);
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(doctorToken) },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 422 for an invalid status transition (pending → completed)", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([mockDetailRow]) as any
+    );
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(adminToken) },
+      body: JSON.stringify({ status: "completed" }),
+    });
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.message).toMatch(/invalid.*transition/i);
+  });
+
+  it("returns 403 when patient tries to confirm (only cancel allowed)", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([mockDetailRow]) as any
+    );
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(patientToken) },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when doctor tries to cancel (not allowed for doctor)", async () => {
+    const confirmedAppt = {
+      ...mockDetailRow,
+      appointment: { ...mockDetailRow.appointment, status: "confirmed" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([confirmedAppt]) as any
+    );
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(doctorToken) },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 200 when patient cancels a pending appointment", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([mockDetailRow]) as any // status: pending
+    );
+    const updatedAppt = {
+      ...mockDetailRow,
+      appointment: { ...mockDetailRow.appointment, status: "cancelled" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([updatedAppt]) as any // re-fetch after update
+    );
+    vi.mocked(db.update).mockReturnValueOnce(
+      makeUpdateChain([{ id: APPT_ID, status: "cancelled" }]) as any
+    );
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(patientToken) },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.appointment.status).toBe("cancelled");
+  });
+
+  it("returns 200 when doctor confirms a pending appointment", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([mockDetailRow]) as any // status: pending
+    );
+    const updatedAppt = {
+      ...mockDetailRow,
+      appointment: { ...mockDetailRow.appointment, status: "confirmed" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([updatedAppt]) as any
+    );
+    vi.mocked(db.update).mockReturnValueOnce(
+      makeUpdateChain([{ id: APPT_ID, status: "confirmed" }]) as any
+    );
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(doctorToken) },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.appointment.status).toBe("confirmed");
+  });
+
+  it("returns 200 when admin sets any valid transition", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([mockDetailRow]) as any // status: pending
+    );
+    const updatedAppt = {
+      ...mockDetailRow,
+      appointment: { ...mockDetailRow.appointment, status: "confirmed" },
+    };
+    vi.mocked(db.select).mockReturnValueOnce(
+      makeJoinChain([updatedAppt]) as any
+    );
+    vi.mocked(db.update).mockReturnValueOnce(
+      makeUpdateChain([{ id: APPT_ID, status: "confirmed" }]) as any
+    );
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(adminToken) },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 for an unrecognised status value", async () => {
+    const res = await app.request(STATUS_URL, {
+      method: "PATCH",
+      headers: { ...jsonH, ...bearer(adminToken) },
+      body: JSON.stringify({ status: "invalid-status" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
