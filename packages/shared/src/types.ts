@@ -75,6 +75,23 @@ export interface Appointment {
   doctor?: Doctor;
 }
 
+export interface MedicalRecordAppointmentSummary {
+  id: string;
+  appointmentDate: string;
+  startTime: string;
+  type: string;
+  status: string;
+}
+
+export interface MedicalRecordDoctorSummary {
+  id: string;
+  specialization: string;
+  user: {
+    firstName: string;
+    lastName: string;
+  };
+}
+
 export interface MedicalRecord {
   id: string;
   appointmentId: string;
@@ -84,7 +101,8 @@ export interface MedicalRecord {
   symptoms: string | null;
   notes: string | null;
   createdAt: string;
-  appointment?: Appointment;
+  appointment?: MedicalRecordAppointmentSummary;
+  doctor?: MedicalRecordDoctorSummary;
 }
 
 export interface MedicalRecordAttachment {

@@ -178,7 +178,7 @@ describe("DoctorsPage — admin view", () => {
     });
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
-      revalidate: revalidateMock,
+      revalidate: revalidateMock as any,
       state: "idle",
     });
   });

@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db } from "../db";
 import {
   medicalRecords,
@@ -182,6 +182,7 @@ medicalRecordsRoute.openapi(createMedicalRecordRoute, async (c) => {
 
 const listMedicalRecordsQuery = z.object({
   patientId: z.string().uuid().optional(),
+  appointmentId: z.string().uuid().optional(),
 });
 
 const listMedicalRecordsRoute = createRoute({
@@ -210,9 +211,10 @@ const listMedicalRecordsRoute = createRoute({
 medicalRecordsRoute.openapi(listMedicalRecordsRoute, async (c) => {
   const userId = c.get("userId");
   const role = c.get("userRole");
-  const { patientId: queryPatientId } = c.req.valid("query");
+  const { patientId: queryPatientId, appointmentId: queryAppointmentId } =
+    c.req.valid("query");
 
-  let whereCondition;
+  let roleCondition;
 
   if (role === "patient") {
     const [patient] = await db
@@ -222,7 +224,7 @@ medicalRecordsRoute.openapi(listMedicalRecordsRoute, async (c) => {
       .limit(1);
 
     if (!patient) return c.json([], 200);
-    whereCondition = eq(medicalRecords.patientId, patient.id);
+    roleCondition = eq(medicalRecords.patientId, patient.id);
   } else if (role === "doctor") {
     const [doctor] = await db
       .select({ id: doctors.id })
@@ -231,14 +233,20 @@ medicalRecordsRoute.openapi(listMedicalRecordsRoute, async (c) => {
       .limit(1);
 
     if (!doctor) return c.json([], 200);
-    whereCondition = eq(medicalRecords.doctorId, doctor.id);
+    roleCondition = eq(medicalRecords.doctorId, doctor.id);
   } else if (role === "admin") {
-    whereCondition = queryPatientId
+    roleCondition = queryPatientId
       ? eq(medicalRecords.patientId, queryPatientId)
       : undefined;
   } else {
     return c.json({ message: "Insufficient permissions" }, 403);
   }
+
+  const whereCondition = queryAppointmentId
+    ? roleCondition
+      ? and(roleCondition, eq(medicalRecords.appointmentId, queryAppointmentId))
+      : eq(medicalRecords.appointmentId, queryAppointmentId)
+    : roleCondition;
 
   const rows = await db
     .select({
