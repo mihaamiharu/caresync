@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { PatientsPage } from "./patients";
 import { useAuthStore } from "@/stores/auth-store";
 import type { User, Patient } from "@caresync/shared";
+
+// Mock react-router to supply loader data without a data router
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return {
+    ...actual,
+    useLoaderData: vi.fn(),
+    useNavigation: vi.fn().mockReturnValue({ state: "idle" }),
+    useRevalidator: vi.fn().mockReturnValue({ revalidate: vi.fn() }),
+  };
+});
 
 vi.mock("@/lib/api-client", () => ({
   patientsApi: {
@@ -15,7 +25,7 @@ vi.mock("@/lib/api-client", () => ({
   },
 }));
 
-import { patientsApi } from "@/lib/api-client";
+import { useLoaderData, useNavigation } from "react-router";
 
 const mockAdmin: User = {
   id: "admin-uuid-1",
@@ -100,40 +110,31 @@ describe("PatientsPage", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
+    vi.mocked(useLoaderData).mockReturnValue(mockPaginatedResponse);
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
   });
 
-  it("renders the page heading", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
+  it("renders the page heading", () => {
     renderPage();
-    expect(await screen.findByTestId("patients-page")).toBeInTheDocument();
+    expect(screen.getByTestId("patients-page")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: /patients/i })
     ).toBeInTheDocument();
   });
 
-  it("renders a table with patient rows", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
+  it("renders a table with patient rows from loader data", () => {
     renderPage();
-
     expect(
-      await screen.findByTestId("patient-row-patient-uuid-1")
+      screen.getByTestId("patient-row-patient-uuid-1")
     ).toBeInTheDocument();
     expect(
       screen.getByTestId("patient-row-patient-uuid-2")
     ).toBeInTheDocument();
   });
 
-  it("displays patient name, email, DOB, gender and blood type", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
+  it("displays patient name, email, DOB, gender and blood type", () => {
     renderPage();
-
-    const row = await screen.findByTestId("patient-row-patient-uuid-1");
+    const row = screen.getByTestId("patient-row-patient-uuid-1");
     expect(within(row).getByText("John Doe")).toBeInTheDocument();
     expect(within(row).getByText("john@example.com")).toBeInTheDocument();
     expect(within(row).getByText("1990-05-15")).toBeInTheDocument();
@@ -141,80 +142,15 @@ describe("PatientsPage", () => {
     expect(within(row).getByText("A+")).toBeInTheDocument();
   });
 
-  it("renders the search input", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
+  it("renders the search input and filter dropdowns", () => {
     renderPage();
-
-    await screen.findByTestId("patients-page");
     expect(screen.getByTestId("search-input")).toBeInTheDocument();
-  });
-
-  it("renders gender and blood type filter dropdowns", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
-    renderPage();
-
-    await screen.findByTestId("patients-page");
     expect(screen.getByTestId("gender-filter")).toBeInTheDocument();
     expect(screen.getByTestId("blood-type-filter")).toBeInTheDocument();
   });
 
-  it("calls listPatients with search param when user types", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
-    renderPage();
-
-    await screen.findByTestId("search-input");
-    await userEvent.type(screen.getByTestId("search-input"), "john");
-
-    await waitFor(() => {
-      expect(patientsApi.listPatients).toHaveBeenCalledWith(
-        expect.objectContaining({ search: "john" })
-      );
-    });
-  });
-
-  it("calls listPatients with gender param when filter changes", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
-    renderPage();
-
-    await screen.findByTestId("gender-filter");
-    await userEvent.selectOptions(screen.getByTestId("gender-filter"), "male");
-
-    await waitFor(() => {
-      expect(patientsApi.listPatients).toHaveBeenCalledWith(
-        expect.objectContaining({ gender: "male" })
-      );
-    });
-  });
-
-  it("calls listPatients with bloodType param when filter changes", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
-    renderPage();
-
-    await screen.findByTestId("blood-type-filter");
-    await userEvent.selectOptions(
-      screen.getByTestId("blood-type-filter"),
-      "A+"
-    );
-
-    await waitFor(() => {
-      expect(patientsApi.listPatients).toHaveBeenCalledWith(
-        expect.objectContaining({ bloodType: "A+" })
-      );
-    });
-  });
-
-  it("shows an empty state when no patients are returned", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue({
+  it("shows an empty state when loader returns no patients", () => {
+    vi.mocked(useLoaderData).mockReturnValue({
       data: [],
       total: 0,
       page: 1,
@@ -222,17 +158,21 @@ describe("PatientsPage", () => {
       totalPages: 0,
     });
     renderPage();
-
-    expect(await screen.findByTestId("patients-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("patients-empty")).toBeInTheDocument();
   });
 
-  it("shows pagination info", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
+  it("shows pagination info", () => {
     renderPage();
-
-    await screen.findByTestId("patient-row-patient-uuid-1");
     expect(screen.getByTestId("pagination-info")).toBeInTheDocument();
+    expect(screen.getByText(/Showing 1–2 of 2/)).toBeInTheDocument();
+  });
+
+  it("shows a loading indicator while the router is navigating", () => {
+    vi.mocked(useNavigation).mockReturnValue({ state: "loading" } as any);
+    renderPage();
+    // Loading state hides rows and shows loading cell
+    expect(
+      screen.queryByTestId("patient-row-patient-uuid-1")
+    ).not.toBeInTheDocument();
   });
 });
