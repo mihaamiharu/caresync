@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { AppLayout } from "@/layouts/app-layout";
 import { DashboardPage } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
@@ -34,67 +34,81 @@ function PatientOnlyRoute() {
   return <BookAppointmentPage />;
 }
 
-export function App() {
-  return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route
-            path="/profile"
-            loader={profileLoader}
-            element={<ProfilePage />}
-          />
-          <Route
-            path="/departments"
-            loader={departmentsLoader}
-            element={<DepartmentsPage />}
-          />
-          <Route
-            path="/doctors"
-            loader={doctorsLoader}
-            element={<DoctorsPage />}
-          />
-          <Route
-            path="/doctors/:id"
-            loader={doctorProfileLoader}
-            element={<DoctorProfilePage />}
-          />
-          <Route
-            path="/patients"
-            loader={patientsLoader}
-            element={<PatientsPage />}
-          />
-          <Route
-            path="/appointments"
-            loader={appointmentsLoader}
-            element={<AppointmentsPage />}
-          />
-          <Route
-            path="/appointments/:id"
-            loader={appointmentDetailLoader}
-            element={<AppointmentDetailPage />}
-          />
-          <Route
-            path="/appointments/book"
-            loader={bookAppointmentLoader}
-            element={<PatientOnlyRoute />}
-          />
-          <Route
-            path="/medical-records"
-            loader={medicalRecordsLoader}
-            element={<MedicalRecordsPage />}
-          />
-          <Route
-            path="/medical-records/:id"
-            loader={medicalRecordDetailLoader}
-            element={<MedicalRecordDetailPage />}
-          />
-        </Route>
-      </Route>
-    </Routes>
-  );
-}
+export const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />,
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: "/",
+        element: <Navigate to="/dashboard" replace />,
+      },
+      {
+        element: <AppLayout />,
+        children: [
+          {
+            path: "/dashboard",
+            element: <DashboardPage />,
+          },
+          {
+            path: "/profile",
+            loader: profileLoader,
+            element: <ProfilePage />,
+          },
+          {
+            path: "/departments",
+            loader: departmentsLoader,
+            element: <DepartmentsPage />,
+          },
+          {
+            path: "/doctors",
+            loader: doctorsLoader,
+            element: <DoctorsPage />,
+          },
+          {
+            path: "/doctors/:id",
+            loader: doctorProfileLoader,
+            element: <DoctorProfilePage />,
+          },
+          {
+            path: "/patients",
+            loader: patientsLoader,
+            element: <PatientsPage />,
+          },
+          {
+            path: "/appointments",
+            loader: appointmentsLoader,
+            element: <AppointmentsPage />,
+          },
+          {
+            path: "/appointments/:id",
+            loader: appointmentDetailLoader,
+            element: <AppointmentDetailPage />,
+          },
+          {
+            path: "/appointments/book",
+            loader: bookAppointmentLoader,
+            element: <PatientOnlyRoute />,
+          },
+          {
+            path: "/medical-records",
+            loader: medicalRecordsLoader,
+            element: <MedicalRecordsPage />,
+          },
+          {
+            path: "/medical-records/:id",
+            loader: medicalRecordDetailLoader,
+            element: <MedicalRecordDetailPage />,
+          },
+        ],
+      },
+    ],
+  },
+]);
