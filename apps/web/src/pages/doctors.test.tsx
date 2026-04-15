@@ -19,18 +19,21 @@ vi.mock("react-router", async (importOriginal) => {
 
 vi.mock("@/lib/api-client", () => ({
   doctorsApi: {
+    listDoctors: vi.fn(),
     createDoctor: vi.fn(),
     updateDoctor: vi.fn(),
     deleteDoctor: vi.fn(),
   },
-  departmentsApi: {},
+  departmentsApi: {
+    listDepartments: vi.fn(),
+  },
   authApi: {
     login: vi.fn(),
   },
 }));
 
-import { useLoaderData, useNavigation, useRevalidator } from "react-router";
-import { doctorsApi } from "@/lib/api-client";
+import { useNavigation, useRevalidator } from "react-router";
+import { doctorsApi, departmentsApi } from "@/lib/api-client";
 
 const mockPatient: User = {
   id: "user-patient-1",
@@ -104,9 +107,21 @@ describe("DoctorsPage — read-only view (patient)", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(useLoaderData).mockReturnValue({
-      doctors: mockDoctors,
-      departments: mockDepts,
+    vi.mocked(doctorsApi.listDoctors).mockImplementation((params) =>
+      Promise.resolve({
+        data: params?.search
+          ? mockDoctors.filter((d) => {
+              const name =
+                `${d.user?.firstName ?? ""} ${d.user?.lastName ?? ""}`.toLowerCase();
+              const spec = d.specialization.toLowerCase();
+              const q = params.search!.toLowerCase();
+              return name.includes(q) || spec.includes(q);
+            })
+          : mockDoctors,
+      })
+    );
+    vi.mocked(departmentsApi.listDepartments).mockResolvedValue({
+      data: mockDepts,
     });
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
@@ -123,10 +138,12 @@ describe("DoctorsPage — read-only view (patient)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows doctor cards from loader data", () => {
+  it("shows doctor cards from loader data", async () => {
     renderPage();
     expect(
-      screen.getByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
+      await screen.findByTestId(
+        "doctor-card-00000000-0000-0000-0000-000000000001"
+      )
     ).toBeInTheDocument();
     expect(screen.getByText("Dr. James Smith")).toBeInTheDocument();
     // Cardiology appears as specialization AND department
@@ -141,7 +158,6 @@ describe("DoctorsPage — read-only view (patient)", () => {
   });
 
   it("shows a loading indicator while the router is navigating", () => {
-    vi.mocked(useNavigation).mockReturnValue({ state: "loading" } as any);
     renderPage();
     expect(screen.getByTestId("doctors-loading")).toBeInTheDocument();
   });
@@ -150,35 +166,36 @@ describe("DoctorsPage — read-only view (patient)", () => {
     renderPage();
     const searchInput = screen.getByTestId("doctors-search");
     await userEvent.type(searchInput, "james");
-    expect(
-      screen.getByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
+      ).toBeInTheDocument();
+    });
     await userEvent.clear(searchInput);
     await userEvent.type(searchInput, "zzznomatch");
-    expect(
-      screen.queryByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
+      ).not.toBeInTheDocument();
+    });
   });
 });
 
 describe("DoctorsPage — admin view", () => {
-  let revalidateMock: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     useAuthStore.setState({
       user: mockAdmin,
       accessToken: "tok-admin",
       isLoading: false,
     });
-    revalidateMock = vi.fn();
     vi.resetAllMocks();
-    vi.mocked(useLoaderData).mockReturnValue({
-      doctors: mockDoctors,
-      departments: mockDepts,
+    vi.mocked(doctorsApi.listDoctors).mockResolvedValue({ data: mockDoctors });
+    vi.mocked(departmentsApi.listDepartments).mockResolvedValue({
+      data: mockDepts,
     });
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
-      revalidate: revalidateMock as any,
+      revalidate: vi.fn(),
       state: "idle",
     });
   });
@@ -211,9 +228,9 @@ describe("DoctorsPage — admin view", () => {
       "password123"
     );
 
-    // Departments are available synchronously from loader data
+    // Departments are loaded asynchronously in the modal
     expect(
-      screen.getByRole("option", { name: "Cardiology" })
+      await screen.findByRole("option", { name: "Cardiology" })
     ).toBeInTheDocument();
 
     await userEvent.selectOptions(
@@ -237,13 +254,17 @@ describe("DoctorsPage — admin view", () => {
         })
       );
     });
-    await waitFor(() => expect(revalidateMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(doctorsApi.listDoctors).toHaveBeenCalledTimes(2)
+    );
   });
 
-  it("shows edit and delete buttons on each doctor card for admin", () => {
+  it("shows edit and delete buttons on each doctor card for admin", async () => {
     renderPage();
     expect(
-      screen.getByTestId("edit-doctor-00000000-0000-0000-0000-000000000001")
+      await screen.findByTestId(
+        "edit-doctor-00000000-0000-0000-0000-000000000001"
+      )
     ).toBeInTheDocument();
     expect(
       screen.getByTestId("delete-doctor-00000000-0000-0000-0000-000000000001")
