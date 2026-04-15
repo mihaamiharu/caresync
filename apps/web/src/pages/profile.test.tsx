@@ -23,7 +23,6 @@ vi.mock("@/lib/api-client", () => ({
     updateAvatar: vi.fn(),
   },
   patientsApi: {
-    getPatient: vi.fn(),
     upsertPatient: vi.fn(),
   },
   authApi: {
@@ -31,6 +30,7 @@ vi.mock("@/lib/api-client", () => ({
   },
 }));
 
+import { useLoaderData } from "react-router";
 import { usersApi, patientsApi } from "@/lib/api-client";
 
 const mockUser: User = {
@@ -76,7 +76,7 @@ describe("ProfilePage", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: null });
     vi.mocked(usersApi.updateProfile).mockResolvedValue(mockUser);
     vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
   });
@@ -199,7 +199,7 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: null });
     vi.mocked(usersApi.updateProfile).mockResolvedValue(mockUser);
     vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
   });
@@ -209,13 +209,11 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
     expect(screen.getByTestId("medical-info-section")).toBeInTheDocument();
   });
 
-  it("pre-fills medical fields from existing patient data in loader", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(mockPatient);
+  it("pre-fills medical fields from existing patient data in loader", () => {
+    vi.mocked(useLoaderData).mockReturnValue({ patient: mockPatient });
     renderProfile();
 
-    await waitFor(() => {
-      expect(screen.getByTestId("dob-input")).toHaveValue("1990-05-15");
-    });
+    expect(screen.getByTestId("dob-input")).toHaveValue("1990-05-15");
     expect(screen.getByTestId("gender-select")).toHaveValue("male");
     expect(screen.getByTestId("blood-type-select")).toHaveValue("A+");
     expect(screen.getByTestId("allergies-input")).toHaveValue("penicillin");
@@ -228,7 +226,7 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
   });
 
   it("shows empty fields when no patient row exists", () => {
-    // getPatient mocked to return null in beforeEach
+    // useLoaderData returns { patient: null } from beforeEach
     renderProfile();
 
     expect(screen.getByTestId("dob-input")).toHaveValue("");
@@ -237,7 +235,7 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
   });
 
   it("calls patientsApi.upsertPatient on submit", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(mockPatient);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: mockPatient });
     vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
     renderProfile();
 
@@ -249,7 +247,7 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
   });
 
   it("shows success message after saving medical info", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(mockPatient);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: mockPatient });
     vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
     renderProfile();
 

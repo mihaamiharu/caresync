@@ -32,8 +32,8 @@ vi.mock("@/lib/api-client", () => ({
   },
 }));
 
-import { useNavigation, useRevalidator } from "react-router";
-import { doctorsApi, departmentsApi } from "@/lib/api-client";
+import { useLoaderData, useNavigation, useRevalidator } from "react-router";
+import { doctorsApi } from "@/lib/api-client";
 
 const mockPatient: User = {
   id: "user-patient-1",
@@ -107,21 +107,9 @@ describe("DoctorsPage — read-only view (patient)", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(doctorsApi.listDoctors).mockImplementation((params) =>
-      Promise.resolve({
-        data: params?.search
-          ? mockDoctors.filter((d) => {
-              const name =
-                `${d.user?.firstName ?? ""} ${d.user?.lastName ?? ""}`.toLowerCase();
-              const spec = d.specialization.toLowerCase();
-              const q = params.search!.toLowerCase();
-              return name.includes(q) || spec.includes(q);
-            })
-          : mockDoctors,
-      })
-    );
-    vi.mocked(departmentsApi.listDepartments).mockResolvedValue({
-      data: mockDepts,
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctors: mockDoctors,
+      departments: mockDepts,
     });
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
@@ -138,12 +126,10 @@ describe("DoctorsPage — read-only view (patient)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows doctor cards from loader data", async () => {
+  it("shows doctor cards from loader data", () => {
     renderPage();
     expect(
-      await screen.findByTestId(
-        "doctor-card-00000000-0000-0000-0000-000000000001"
-      )
+      screen.getByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
     ).toBeInTheDocument();
     expect(screen.getByText("Dr. James Smith")).toBeInTheDocument();
     // Cardiology appears as specialization AND department
@@ -158,6 +144,7 @@ describe("DoctorsPage — read-only view (patient)", () => {
   });
 
   it("shows a loading indicator while the router is navigating", () => {
+    vi.mocked(useNavigation).mockReturnValue({ state: "loading" } as any);
     renderPage();
     expect(screen.getByTestId("doctors-loading")).toBeInTheDocument();
   });
@@ -182,6 +169,8 @@ describe("DoctorsPage — read-only view (patient)", () => {
 });
 
 describe("DoctorsPage — admin view", () => {
+  let revalidateMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     useAuthStore.setState({
       user: mockAdmin,
@@ -189,13 +178,14 @@ describe("DoctorsPage — admin view", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(doctorsApi.listDoctors).mockResolvedValue({ data: mockDoctors });
-    vi.mocked(departmentsApi.listDepartments).mockResolvedValue({
-      data: mockDepts,
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctors: mockDoctors,
+      departments: mockDepts,
     });
+    revalidateMock = vi.fn();
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
-      revalidate: vi.fn(),
+      revalidate: revalidateMock as any,
       state: "idle",
     });
   });
@@ -228,9 +218,9 @@ describe("DoctorsPage — admin view", () => {
       "password123"
     );
 
-    // Departments are loaded asynchronously in the modal
+    // Departments are available synchronously from loader data
     expect(
-      await screen.findByRole("option", { name: "Cardiology" })
+      screen.getByRole("option", { name: "Cardiology" })
     ).toBeInTheDocument();
 
     await userEvent.selectOptions(
@@ -254,17 +244,13 @@ describe("DoctorsPage — admin view", () => {
         })
       );
     });
-    await waitFor(() =>
-      expect(doctorsApi.listDoctors).toHaveBeenCalledTimes(2)
-    );
+    await waitFor(() => expect(revalidateMock).toHaveBeenCalled());
   });
 
-  it("shows edit and delete buttons on each doctor card for admin", async () => {
+  it("shows edit and delete buttons on each doctor card for admin", () => {
     renderPage();
     expect(
-      await screen.findByTestId(
-        "edit-doctor-00000000-0000-0000-0000-000000000001"
-      )
+      screen.getByTestId("edit-doctor-00000000-0000-0000-0000-000000000001")
     ).toBeInTheDocument();
     expect(
       screen.getByTestId("delete-doctor-00000000-0000-0000-0000-000000000001")

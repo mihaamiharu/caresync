@@ -25,8 +25,7 @@ vi.mock("@/lib/api-client", () => ({
   },
 }));
 
-import { useNavigation } from "react-router";
-import { patientsApi } from "@/lib/api-client";
+import { useLoaderData, useNavigation } from "react-router";
 
 const mockAdmin: User = {
   id: "admin-uuid-1",
@@ -111,9 +110,7 @@ describe("PatientsPage", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(patientsApi.listPatients).mockResolvedValue(
-      mockPaginatedResponse
-    );
+    vi.mocked(useLoaderData).mockReturnValue(mockPaginatedResponse);
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
   });
 
@@ -125,19 +122,19 @@ describe("PatientsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders a table with patient rows from loader data", async () => {
+  it("renders a table with patient rows from loader data", () => {
     renderPage();
     expect(
-      await screen.findByTestId("patient-row-patient-uuid-1")
+      screen.getByTestId("patient-row-patient-uuid-1")
     ).toBeInTheDocument();
     expect(
       screen.getByTestId("patient-row-patient-uuid-2")
     ).toBeInTheDocument();
   });
 
-  it("displays patient name, email, DOB, gender and blood type", async () => {
+  it("displays patient name, email, DOB, gender and blood type", () => {
     renderPage();
-    const row = await screen.findByTestId("patient-row-patient-uuid-1");
+    const row = screen.getByTestId("patient-row-patient-uuid-1");
     expect(within(row).getByText("John Doe")).toBeInTheDocument();
     expect(within(row).getByText("john@example.com")).toBeInTheDocument();
     expect(within(row).getByText("1990-05-15")).toBeInTheDocument();
@@ -152,8 +149,8 @@ describe("PatientsPage", () => {
     expect(screen.getByTestId("blood-type-filter")).toBeInTheDocument();
   });
 
-  it("shows an empty state when loader returns no patients", async () => {
-    vi.mocked(patientsApi.listPatients).mockResolvedValue({
+  it("shows an empty state when loader returns no patients", () => {
+    vi.mocked(useLoaderData).mockReturnValue({
       data: [],
       total: 0,
       page: 1,
@@ -161,19 +158,19 @@ describe("PatientsPage", () => {
       totalPages: 0,
     });
     renderPage();
-    expect(await screen.findByTestId("patients-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("patients-empty")).toBeInTheDocument();
   });
 
-  it("shows pagination info", async () => {
+  it("shows pagination info", () => {
     renderPage();
-    await screen.findByTestId("patient-row-patient-uuid-1");
     expect(screen.getByTestId("pagination-info")).toBeInTheDocument();
     expect(screen.getByText(/Showing 1–2 of 2/)).toBeInTheDocument();
   });
 
   it("shows a loading indicator while the router is navigating", () => {
+    vi.mocked(useNavigation).mockReturnValue({ state: "loading" } as any);
     renderPage();
-    // Loading state hides rows initially (data fetched async)
+    // Loading state hides rows
     expect(
       screen.queryByTestId("patient-row-patient-uuid-1")
     ).not.toBeInTheDocument();

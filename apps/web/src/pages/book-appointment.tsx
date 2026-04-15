@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useState } from "react";
+import { useLoaderData, useNavigate } from "react-router";
 import {
   CalendarDays,
   Check,
@@ -19,6 +19,13 @@ import {
 } from "@/lib/api-client";
 import type { Department, Doctor, AppointmentType } from "@caresync/shared";
 import { APPOINTMENT_TYPES } from "@caresync/shared";
+
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+export async function bookAppointmentLoader() {
+  const res = await departmentsApi.listDepartments({ limit: 100 });
+  return { departments: res.data.filter((d) => d.isActive) };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,6 +59,7 @@ interface WizardState {
   // Step 2
   doctorId: string;
   doctorName: string;
+  doctors: Doctor[];
   // Step 3
   appointmentDate: string;
   startTime: string; // ISO UTC
@@ -70,6 +78,7 @@ const initialState: WizardState = {
   departmentName: "",
   doctorId: "",
   doctorName: "",
+  doctors: [],
   appointmentDate: "",
   startTime: "",
   type: "consultation",
@@ -156,25 +165,12 @@ function StepIndicator({
 // ─── Step 1: Department ───────────────────────────────────────────────────────
 
 function Step1Department({
+  departments,
   onSelect,
 }: {
+  departments: Department[];
   onSelect: (id: string, name: string) => void;
 }) {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    departmentsApi
-      .listDepartments({ limit: 100 })
-      .then((res) => setDepartments(res.data.filter((d) => d.isActive)))
-      .catch(() => setError("Failed to load departments. Please try again."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <CenteredLoader />;
-  if (error) return <ErrorMessage message={error} />;
-
   return (
     <div>
       <h2 className="mb-1 text-lg font-semibold">Select a Department</h2>
@@ -211,31 +207,16 @@ function Step1Department({
 // ─── Step 2: Doctor ───────────────────────────────────────────────────────────
 
 function Step2Doctor({
-  departmentId,
+  doctors,
   departmentName,
   onSelect,
   onBack,
 }: {
-  departmentId: string;
+  doctors: Doctor[];
   departmentName: string;
   onSelect: (id: string, name: string) => void;
   onBack: () => void;
 }) {
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    doctorsApi
-      .listDoctors({ departmentId, limit: 100 })
-      .then((res) => setDoctors(res.data))
-      .catch(() => setError("Failed to load doctors. Please try again."))
-      .finally(() => setLoading(false));
-  }, [departmentId]);
-
-  if (loading) return <CenteredLoader />;
-  if (error) return <ErrorMessage message={error} />;
-
   return (
     <div>
       <h2 className="mb-1 text-lg font-semibold">Select a Doctor</h2>
@@ -306,23 +287,18 @@ function Step3DateTime({
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
 
-  const fetchSlots = useCallback(
-    (date: string) => {
-      if (!date) return;
-      setLoadingSlots(true);
-      setSlotsError(null);
-      schedulesApi
-        .getAvailableSlots(doctorId, date)
-        .then(setSlots)
-        .catch(() => setSlotsError("Failed to load time slots."))
-        .finally(() => setLoadingSlots(false));
-    },
-    [doctorId]
-  );
-
-  useEffect(() => {
-    if (appointmentDate) fetchSlots(appointmentDate);
-  }, [appointmentDate, fetchSlots]);
+  const handleDateChange = (date: string) => {
+    onDateChange(date);
+    onSlotSelect(""); // reset slot when date changes
+    if (!date) return;
+    setLoadingSlots(true);
+    setSlotsError(null);
+    schedulesApi
+      .getAvailableSlots(doctorId, date)
+      .then(setSlots)
+      .catch(() => setSlotsError("Failed to load time slots."))
+      .finally(() => setLoadingSlots(false));
+  };
 
   return (
     <div>
@@ -342,10 +318,7 @@ function Step3DateTime({
           min={todayISO()}
           max={maxDateISO()}
           value={appointmentDate}
-          onChange={(e) => {
-            onDateChange(e.target.value);
-            onSlotSelect(""); // reset slot when date changes
-          }}
+          onChange={(e) => handleDateChange(e.target.value)}
           className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
@@ -679,6 +652,7 @@ function BackButton({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function BookAppointmentPage() {
+  const { departments } = useLoaderData() as { departments: Department[] };
   const [state, setState] = useState<WizardState>(initialState);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -698,12 +672,14 @@ export function BookAppointmentPage() {
     goToStep(step as WizardState["step"]);
   };
 
-  // Step 1 → 2
-  const handleDepartmentSelect = (id: string, name: string) => {
+  // Step 1 → 2: fetch doctors for the selected department
+  const handleDepartmentSelect = async (id: string, name: string) => {
+    const res = await doctorsApi.listDoctors({ departmentId: id, limit: 100 });
     setState((s) => ({
       ...s,
       departmentId: id,
       departmentName: name,
+      doctors: res.data,
       // reset downstream
       doctorId: "",
       doctorName: "",
@@ -760,28 +736,24 @@ export function BookAppointmentPage() {
       }));
     } catch (err: any) {
       const status = err?.response?.status;
+      let errMsg: string;
       if (status === 409) {
-        setSubmitError(
-          "This slot was just booked by someone else — please go back and select another time."
-        );
+        errMsg =
+          "This slot was just booked by someone else — please go back and select another time.";
       } else {
-        setSubmitError(
+        errMsg =
           err?.response?.data?.message ??
-            "Failed to book appointment. Please try again."
-        );
+          "Failed to book appointment. Please try again.";
+      }
+      setSubmitError(errMsg);
+      // If slot conflict, clear the selected slot so they must re-pick
+      if (errMsg.includes("just booked")) {
+        setState((s) => ({ ...s, startTime: "" }));
       }
     } finally {
       setSubmitting(false);
     }
   };
-
-  // Handle 409: send user back to step 3
-  useEffect(() => {
-    if (submitError?.includes("just booked")) {
-      // clear the selected slot so they must re-pick
-      setState((s) => ({ ...s, startTime: "" }));
-    }
-  }, [submitError]);
 
   const handleBookAnother = () => {
     setState(initialState);
@@ -807,11 +779,14 @@ export function BookAppointmentPage() {
 
       <div className="rounded-lg border border-border bg-card p-6">
         {state.step === 1 && (
-          <Step1Department onSelect={handleDepartmentSelect} />
+          <Step1Department
+            departments={departments}
+            onSelect={handleDepartmentSelect}
+          />
         )}
         {state.step === 2 && (
           <Step2Doctor
-            departmentId={state.departmentId}
+            doctors={state.doctors}
             departmentName={state.departmentName}
             onSelect={handleDoctorSelect}
             onBack={() => goToStep(1)}

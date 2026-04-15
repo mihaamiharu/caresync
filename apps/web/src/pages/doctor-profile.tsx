@@ -1,9 +1,29 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useState } from "react";
+import {
+  useParams,
+  useNavigate,
+  useLoaderData,
+  useNavigation,
+} from "react-router";
 import { doctorsApi, schedulesApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Doctor, DoctorSchedule } from "@caresync/shared";
 import { ArrowLeft, Mail, Phone, Award, Building2, Star } from "lucide-react";
+
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+export async function doctorProfileLoader({
+  params,
+}: {
+  params: { id?: string };
+}) {
+  const id = params.id!;
+  const [doctor, schedule] = await Promise.all([
+    doctorsApi.getDoctor(id),
+    schedulesApi.getSchedule(id),
+  ]);
+  return { doctor, schedule };
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -33,48 +53,42 @@ const defaultDayConfig: DayConfig = {
   endTime: "17:00",
 };
 
-function makeInitialDays(): Record<DayKey, DayConfig> {
-  return Object.fromEntries(
+function makeInitialDays(
+  schedule: DoctorSchedule[]
+): Record<DayKey, DayConfig> {
+  const base = Object.fromEntries(
     DAYS.map((d) => [d.key, { ...defaultDayConfig }])
   ) as Record<DayKey, DayConfig>;
+
+  for (const row of schedule) {
+    const key = row.dayOfWeek as DayKey;
+    if (base[key]) {
+      base[key] = {
+        enabled: true,
+        startTime: row.startTime,
+        endTime: row.endTime,
+      };
+    }
+  }
+  return base;
 }
 
-function DoctorScheduleForm({ doctorId }: { doctorId: string }) {
-  const [slotDuration, setSlotDuration] = useState(30);
-  const [days, setDays] = useState<Record<DayKey, DayConfig>>(makeInitialDays);
-  const [loadError, setLoadError] = useState<string | null>(null);
+function DoctorScheduleForm({
+  doctorId,
+  schedule,
+}: {
+  doctorId: string;
+  schedule: DoctorSchedule[];
+}) {
+  const [slotDuration, setSlotDuration] = useState(() =>
+    schedule.length > 0 ? schedule[0].slotDurationMinutes : 30
+  );
+  const [days, setDays] = useState<Record<DayKey, DayConfig>>(() =>
+    makeInitialDays(schedule)
+  );
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Load existing schedule on mount
-  useEffect(() => {
-    schedulesApi
-      .getSchedule(doctorId)
-      .then((schedule: DoctorSchedule[]) => {
-        if (schedule.length === 0) return;
-        setDays((prev) => {
-          const next = { ...prev };
-          for (const row of schedule) {
-            const key = row.dayOfWeek as DayKey;
-            if (next[key]) {
-              next[key] = {
-                enabled: true,
-                startTime: row.startTime,
-                endTime: row.endTime,
-              };
-            }
-          }
-          return next;
-        });
-        setSlotDuration(schedule[0].slotDurationMinutes);
-      })
-      .catch(() => {
-        setLoadError(
-          "Failed to load your schedule. Please refresh and try again."
-        );
-      });
-  }, [doctorId]);
 
   const toggleDay = (key: DayKey) => {
     setDays((prev) => ({
@@ -128,14 +142,6 @@ function DoctorScheduleForm({ doctorId }: { doctorId: string }) {
       onSubmit={handleSubmit}
       className="space-y-4"
     >
-      {loadError && (
-        <p
-          data-testid="schedule-load-error"
-          className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          {loadError}
-        </p>
-      )}
       {success && (
         <p
           data-testid="schedule-success"
@@ -316,41 +322,19 @@ function DoctorAvailabilityViewer({ doctorId }: { doctorId: string }) {
 // ─── Doctor profile page ──────────────────────────────────────────────────────
 
 export function DoctorProfilePage() {
+  const { doctor, schedule } = useLoaderData() as {
+    doctor: Doctor;
+    schedule: DoctorSchedule[];
+  };
+  const navigation = useNavigation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const [doctor, setDoctor] = useState<Doctor | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    doctorsApi
-      .getDoctor(id)
-      .then((res) => {
-        setDoctor(res);
-      })
-      .catch(() => {
-        setError("Failed to load doctor profile.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [id]);
-
-  if (loading) {
+  if (navigation.state === "loading") {
     return (
       <div className="flex h-64 items-center justify-center text-muted-foreground">
         Loading profile…
-      </div>
-    );
-  }
-
-  if (error || !doctor) {
-    return (
-      <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
-        {error || "Doctor not found."}
       </div>
     );
   }
@@ -449,7 +433,7 @@ export function DoctorProfilePage() {
               <h2 className="mb-4 text-lg font-semibold text-foreground">
                 Manage Schedule
               </h2>
-              <DoctorScheduleForm doctorId={doctor.id} />
+              <DoctorScheduleForm doctorId={id!} schedule={schedule} />
             </div>
           )}
 

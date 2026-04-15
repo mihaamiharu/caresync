@@ -27,7 +27,7 @@ vi.mock("@/lib/api-client", () => ({
   authApi: { login: vi.fn() },
 }));
 
-import { useNavigation, useRevalidator } from "react-router";
+import { useLoaderData, useNavigation, useRevalidator } from "react-router";
 import { departmentsApi } from "@/lib/api-client";
 
 const mockPatient: User = {
@@ -85,15 +85,7 @@ describe("DepartmentsPage — read-only view (patient)", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(departmentsApi.listDepartments).mockImplementation((params) =>
-      Promise.resolve({
-        data: params?.search
-          ? mockDepts.filter((d) =>
-              d.name.toLowerCase().includes(params.search!.toLowerCase())
-            )
-          : mockDepts,
-      })
-    );
+    vi.mocked(useLoaderData).mockReturnValue(mockDepts);
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
       revalidate: vi.fn(),
@@ -109,17 +101,16 @@ describe("DepartmentsPage — read-only view (patient)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows department cards from loader data", async () => {
+  it("shows department cards from loader data", () => {
     renderPage();
-    expect(
-      await screen.findByTestId("department-card-dept-1")
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("department-card-dept-1")).toBeInTheDocument();
     expect(screen.getByTestId("department-card-dept-2")).toBeInTheDocument();
     expect(screen.getByText("Cardiology")).toBeInTheDocument();
     expect(screen.getByText("Neurology")).toBeInTheDocument();
   });
 
   it("shows a loading indicator while the router is navigating", () => {
+    vi.mocked(useNavigation).mockReturnValue({ state: "loading" } as any);
     renderPage();
     expect(screen.getByTestId("departments-loading")).toBeInTheDocument();
   });
@@ -145,6 +136,8 @@ describe("DepartmentsPage — read-only view (patient)", () => {
 });
 
 describe("DepartmentsPage — admin view", () => {
+  let revalidateMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     useAuthStore.setState({
       user: mockAdmin,
@@ -152,12 +145,11 @@ describe("DepartmentsPage — admin view", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(departmentsApi.listDepartments).mockResolvedValue({
-      data: mockDepts,
-    });
+    vi.mocked(useLoaderData).mockReturnValue(mockDepts);
+    revalidateMock = vi.fn();
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
-      revalidate: vi.fn(),
+      revalidate: revalidateMock as any,
       state: "idle",
     });
   });
@@ -193,35 +185,29 @@ describe("DepartmentsPage — admin view", () => {
         expect.objectContaining({ name: "Orthopaedics" })
       );
     });
-    await waitFor(() =>
-      expect(departmentsApi.listDepartments).toHaveBeenCalledTimes(2)
-    );
+    await waitFor(() => expect(revalidateMock).toHaveBeenCalled());
   });
 
-  it("shows edit and delete buttons on each department card for admin", async () => {
+  it("shows edit and delete buttons on each department card for admin", () => {
     renderPage();
-    expect(
-      await screen.findByTestId("edit-department-dept-1")
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("edit-department-dept-1")).toBeInTheDocument();
     expect(screen.getByTestId("delete-department-dept-1")).toBeInTheDocument();
   });
 
   it("calls deleteDepartment and revalidates on delete", async () => {
     vi.mocked(departmentsApi.deleteDepartment).mockResolvedValue(undefined);
     renderPage();
-    const deleteBtn = await screen.findByTestId("delete-department-dept-1");
+    const deleteBtn = screen.getByTestId("delete-department-dept-1");
     await userEvent.click(deleteBtn);
     await waitFor(() =>
       expect(departmentsApi.deleteDepartment).toHaveBeenCalledWith("dept-1")
     );
-    await waitFor(() =>
-      expect(departmentsApi.listDepartments).toHaveBeenCalledTimes(2)
-    );
+    await waitFor(() => expect(revalidateMock).toHaveBeenCalled());
   });
 
   it("opens edit form pre-filled when Edit is clicked", async () => {
     renderPage();
-    const editBtn = await screen.findByTestId("edit-department-dept-1");
+    const editBtn = screen.getByTestId("edit-department-dept-1");
     await userEvent.click(editBtn);
     expect(screen.getByTestId("department-form-modal")).toBeInTheDocument();
     expect(screen.getByTestId("dept-name-input")).toHaveValue("Cardiology");
@@ -232,7 +218,7 @@ describe("DepartmentsPage — admin view", () => {
     vi.mocked(departmentsApi.updateDepartment).mockResolvedValue(updated);
 
     renderPage();
-    const editBtn = await screen.findByTestId("edit-department-dept-1");
+    const editBtn = screen.getByTestId("edit-department-dept-1");
     await userEvent.click(editBtn);
     const nameInput = screen.getByTestId("dept-name-input");
     await userEvent.clear(nameInput);

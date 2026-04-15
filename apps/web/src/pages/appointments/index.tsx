@@ -1,14 +1,46 @@
-import { useState, useEffect, useCallback } from "react";
-import { useSearchParams, Link } from "react-router";
+import {
+  useLoaderData,
+  useNavigation,
+  useSearchParams,
+  Link,
+} from "react-router";
 import { appointmentsApi } from "@/lib/api-client";
 import type { AppointmentListItem } from "@/lib/api-client";
 import { APPOINTMENT_STATUSES } from "@caresync/shared";
 import type { AppointmentStatus } from "@caresync/shared";
 import { StatusBadge } from "./components/StatusBadge";
 
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+export async function appointmentsLoader({ request }: { request: Request }) {
+  const url = new URL(request.url);
+  const page = Number(url.searchParams.get("page") ?? "1");
+  const status = url.searchParams.get("status") ?? "";
+  const from = url.searchParams.get("from") ?? "";
+  const to = url.searchParams.get("to") ?? "";
+  const res = await appointmentsApi.list({
+    page,
+    limit: 10,
+    status: status || undefined,
+    from: from || undefined,
+    to: to || undefined,
+  });
+  return res;
+}
+
 const LIMIT = 10;
 
 export function AppointmentsPage() {
+  const {
+    data: appointments,
+    total,
+    totalPages,
+  } = useLoaderData() as {
+    data: AppointmentListItem[];
+    total: number;
+    totalPages: number;
+  };
+  const navigation = useNavigation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const page = Number(searchParams.get("page") ?? "1");
@@ -16,36 +48,7 @@ export function AppointmentsPage() {
   const from = searchParams.get("from") ?? "";
   const to = searchParams.get("to") ?? "";
 
-  const [appointments, setAppointments] = useState<AppointmentListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await appointmentsApi.list({
-        page,
-        limit: LIMIT,
-        status: status || undefined,
-        from: from || undefined,
-        to: to || undefined,
-      });
-      setAppointments(res.data);
-      setTotal(res.total);
-      setTotalPages(res.totalPages);
-    } catch {
-      setError("Failed to load appointments. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, status, from, to]);
-
-  useEffect(() => {
-    fetchAppointments();
-  }, [fetchAppointments]);
+  const isLoading = navigation.state !== "idle";
 
   function setParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams);
@@ -112,16 +115,6 @@ export function AppointmentsPage() {
         )}
       </div>
 
-      {/* Error state */}
-      {error && (
-        <div
-          data-testid="appointments-error"
-          className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
-          {error}
-        </div>
-      )}
-
       {/* Table */}
       <div className="rounded-lg border border-border bg-card">
         <table className="w-full text-sm">
@@ -148,7 +141,7 @@ export function AppointmentsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && (
+            {isLoading && (
               <tr>
                 <td
                   colSpan={6}
@@ -159,7 +152,7 @@ export function AppointmentsPage() {
                 </td>
               </tr>
             )}
-            {!loading && appointments.length === 0 && (
+            {!isLoading && appointments.length === 0 && (
               <tr>
                 <td
                   colSpan={6}
@@ -170,7 +163,7 @@ export function AppointmentsPage() {
                 </td>
               </tr>
             )}
-            {!loading &&
+            {!isLoading &&
               appointments.map((appt) => (
                 <tr
                   key={appt.id}

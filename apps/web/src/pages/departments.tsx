@@ -1,10 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useLoaderData, useNavigation, useRevalidator } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { departmentsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Department } from "@caresync/shared";
+
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+export async function departmentsLoader(): Promise<Department[]> {
+  const res = await departmentsApi.listDepartments();
+  return res.data;
+}
 
 // ─── Form schema ───────────────────────────────────────────────────────────────
 
@@ -24,7 +32,11 @@ interface DepartmentFormModalProps {
   onSaved: () => void;
 }
 
-function DepartmentFormModal({ dept, onClose, onSaved }: DepartmentFormModalProps) {
+function DepartmentFormModal({
+  dept,
+  onClose,
+  onSaved,
+}: DepartmentFormModalProps) {
   const isEditing = !!dept;
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -57,8 +69,8 @@ function DepartmentFormModal({ dept, onClose, onSaved }: DepartmentFormModalProp
       onSaved();
       onClose();
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const msg = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
       setServerError(msg ?? "Something went wrong. Please try again.");
     }
   };
@@ -73,7 +85,11 @@ function DepartmentFormModal({ dept, onClose, onSaved }: DepartmentFormModalProp
           {isEditing ? "Edit Department" : "Create Department"}
         </h2>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          className="space-y-4"
+        >
           {serverError && (
             <p
               role="alert"
@@ -96,7 +112,10 @@ function DepartmentFormModal({ dept, onClose, onSaved }: DepartmentFormModalProp
               {...register("name")}
             />
             {errors.name && (
-              <p className="text-xs text-destructive" data-testid="dept-name-error">
+              <p
+                className="text-xs text-destructive"
+                data-testid="dept-name-error"
+              >
                 {errors.name.message}
               </p>
             )}
@@ -127,7 +146,10 @@ function DepartmentFormModal({ dept, onClose, onSaved }: DepartmentFormModalProp
               {...register("imageUrl")}
             />
             {errors.imageUrl && (
-              <p className="text-xs text-destructive" data-testid="dept-imageurl-error">
+              <p
+                className="text-xs text-destructive"
+                data-testid="dept-imageurl-error"
+              >
                 {errors.imageUrl.message}
               </p>
             )}
@@ -166,7 +188,12 @@ interface DepartmentCardProps {
   onDelete: (id: string) => void;
 }
 
-function DepartmentCard({ dept, isAdmin, onEdit, onDelete }: DepartmentCardProps) {
+function DepartmentCard({
+  dept,
+  isAdmin,
+  onEdit,
+  onDelete,
+}: DepartmentCardProps) {
   return (
     <div
       data-testid={`department-card-${dept.id}`}
@@ -191,7 +218,9 @@ function DepartmentCard({ dept, isAdmin, onEdit, onDelete }: DepartmentCardProps
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="font-semibold text-card-foreground truncate">{dept.name}</h3>
+            <h3 className="font-semibold text-card-foreground truncate">
+              {dept.name}
+            </h3>
             {dept.description && (
               <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
                 {dept.description}
@@ -231,37 +260,27 @@ function DepartmentCard({ dept, isAdmin, onEdit, onDelete }: DepartmentCardProps
 // ─── DepartmentsPage ───────────────────────────────────────────────────────────
 
 export function DepartmentsPage() {
+  const departments = useLoaderData() as Department[];
+  const navigation = useNavigation();
+  const revalidator = useRevalidator();
+
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "admin";
 
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
 
-  const fetchDepartments = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await departmentsApi.listDepartments({ search: search || undefined });
-      setDepartments(res.data);
-    } catch {
-      setError("Failed to load departments. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
+  const isLoading = navigation.state !== "idle";
 
-  useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
+  const filtered = departments.filter((d) =>
+    d.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleDelete = async (id: string) => {
     try {
       await departmentsApi.deleteDepartment(id);
-      fetchDepartments();
+      revalidator.revalidate();
     } catch {
       // Delete error is silent — a real app would show a toast
     }
@@ -287,7 +306,9 @@ export function DepartmentsPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Departments</h1>
-          <p className="text-sm text-muted-foreground">Browse all clinic departments</p>
+          <p className="text-sm text-muted-foreground">
+            Browse all clinic departments
+          </p>
         </div>
         {isAdmin && (
           <button
@@ -313,31 +334,28 @@ export function DepartmentsPage() {
       </div>
 
       {/* States */}
-      {loading && (
-        <div data-testid="departments-loading" className="py-12 text-center text-muted-foreground">
+      {isLoading && (
+        <div
+          data-testid="departments-loading"
+          className="py-12 text-center text-muted-foreground"
+        >
           Loading departments…
         </div>
       )}
 
-      {error && !loading && (
+      {!isLoading && filtered.length === 0 && (
         <div
-          data-testid="departments-error"
-          className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          data-testid="departments-empty"
+          className="py-12 text-center text-muted-foreground"
         >
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && departments.length === 0 && (
-        <div data-testid="departments-empty" className="py-12 text-center text-muted-foreground">
           No departments found.
         </div>
       )}
 
       {/* Department cards */}
-      {!loading && !error && departments.length > 0 && (
+      {!isLoading && filtered.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {departments.map((dept) => (
+          {filtered.map((dept) => (
             <DepartmentCard
               key={dept.id}
               dept={dept}
@@ -354,7 +372,7 @@ export function DepartmentsPage() {
         <DepartmentFormModal
           dept={editingDept}
           onClose={handleModalClose}
-          onSaved={fetchDepartments}
+          onSaved={revalidator.revalidate}
         />
       )}
     </div>
