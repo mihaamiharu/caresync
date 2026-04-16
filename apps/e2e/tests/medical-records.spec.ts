@@ -295,7 +295,8 @@ test.describe("Medical Records — UI happy-path", () => {
     );
 
     // ── Patient sees record in /medical-records ───────────────────────────
-    // Log out and log in as patient (navigate to /login to clear state)
+    // Clear auth state so the login page doesn't redirect to /dashboard
+    await page.evaluate(() => localStorage.clear());
     await page.goto("/login");
     await loginPage.login(patientCreds.email, patientCreds.password);
     await page.waitForURL("/dashboard");

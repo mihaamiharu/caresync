@@ -1,4 +1,4 @@
-import { type Locator, type Page } from '@playwright/test';
+import { type Locator, type Page } from "@playwright/test";
 
 export class DepartmentsPage {
   readonly page: Page;
@@ -18,32 +18,36 @@ export class DepartmentsPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.pageWrapper = page.getByTestId('departments-page');
-    this.searchInput = page.getByTestId('departments-search');
-    this.loadingIndicator = page.getByTestId('departments-loading');
-    this.errorMessage = page.getByTestId('departments-error');
-    this.emptyState = page.getByTestId('departments-empty');
-    this.createButton = page.getByTestId('create-department-button');
-    this.formModal = page.getByTestId('department-form-modal');
-    this.nameInput = page.getByTestId('dept-name-input');
-    this.descriptionInput = page.getByTestId('dept-description-input');
-    this.submitButton = page.getByTestId('dept-form-submit');
-    this.cancelButton = page.getByTestId('dept-form-cancel');
-    this.formError = page.getByTestId('dept-form-error');
-    this.nameError = page.getByTestId('dept-name-error');
+    this.pageWrapper = page.getByTestId("departments-page");
+    this.searchInput = page.getByTestId("departments-search");
+    this.loadingIndicator = page.getByTestId("departments-loading");
+    this.errorMessage = page.getByTestId("departments-error");
+    this.emptyState = page.getByTestId("departments-empty");
+    this.createButton = page.getByTestId("create-department-button");
+    this.formModal = page.getByTestId("department-form-modal");
+    this.nameInput = page.getByTestId("dept-name-input");
+    this.descriptionInput = page.getByTestId("dept-description-input");
+    this.submitButton = page.getByTestId("dept-form-submit");
+    this.cancelButton = page.getByTestId("dept-form-cancel");
+    this.formError = page.getByTestId("dept-form-error");
+    this.nameError = page.getByTestId("dept-name-error");
   }
 
   async goto() {
-    await this.page.goto('/departments');
+    await this.page.goto("/departments");
   }
 
   async isLoaded() {
-    await this.pageWrapper.waitFor({ state: 'visible' });
+    await this.pageWrapper.waitFor({ state: "visible" });
   }
 
-  /** Wait for the loading spinner to disappear, indicating data has resolved */
+  /** Wait for the page to render and data to resolve */
   async waitForContent() {
-    await this.loadingIndicator.waitFor({ state: 'hidden' });
+    // With React Router loaders the component only renders after the loader
+    // completes, so wait for the page wrapper first, then for any in-page
+    // loading indicator (revalidations) to clear.
+    await this.pageWrapper.waitFor({ state: "visible" });
+    await this.loadingIndicator.waitFor({ state: "hidden" });
   }
 
   /** Get the card locator for a specific department by its ID */
