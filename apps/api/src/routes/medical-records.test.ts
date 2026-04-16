@@ -13,6 +13,7 @@ vi.mock("../db", () => ({
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn().mockResolvedValue(undefined),
   writeFile: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockResolvedValue(Buffer.from("fake-file-content")),
 }));
 
 import { db } from "../db";
@@ -657,5 +658,99 @@ describe("POST /medical-records/:id/attachments", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.fileType).toBe("image/jpeg");
+  });
+});
+
+// ─── GET /medical-records/:id/attachments/:attachmentId/download ──────────────
+
+describe("GET /medical-records/:id/attachments/:attachmentId/download", () => {
+  const DOWNLOAD_URL = `${BASE_URL}/${RECORD_ID}/attachments/${ATTACHMENT_ID}/download`;
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns 401 when no auth header", async () => {
+    const res = await app.request(DOWNLOAD_URL);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when medical record not found", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(makeJoinChain([]) as any);
+
+    const res = await app.request(DOWNLOAD_URL, {
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when doctor does not own the record", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
+      .mockReturnValueOnce(makeSelectChain([mockOtherDoctor]) as any);
+
+    const res = await app.request(DOWNLOAD_URL, {
+      headers: bearer(otherDoctorToken),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when patient does not own the record", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
+      .mockReturnValueOnce(makeSelectChain([mockOtherPatient]) as any);
+
+    const res = await app.request(DOWNLOAD_URL, {
+      headers: bearer(otherPatientToken),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 404 when attachment not found on the record", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any) // record
+      .mockReturnValueOnce(makeSelectChain([]) as any); // attachment not found (admin: no ownership check)
+
+    const res = await app.request(DOWNLOAD_URL, {
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("admin can download any attachment — returns 200 with correct headers", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
+      .mockReturnValueOnce(makeSelectChain([mockAttachment]) as any);
+
+    const res = await app.request(DOWNLOAD_URL, {
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toContain("lab-result.pdf");
+    expect(res.headers.get("Content-Type")).toBe("application/pdf");
+  });
+
+  it("doctor can download attachment from their own record", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any) // ownership
+      .mockReturnValueOnce(makeSelectChain([mockAttachment]) as any); // attachment
+
+    const res = await app.request(DOWNLOAD_URL, {
+      headers: bearer(doctorToken),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toContain("lab-result.pdf");
+  });
+
+  it("patient can download attachment from their own record", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
+      .mockReturnValueOnce(makeSelectChain([mockPatient]) as any) // ownership
+      .mockReturnValueOnce(makeSelectChain([mockAttachment]) as any); // attachment
+
+    const res = await app.request(DOWNLOAD_URL, {
+      headers: bearer(patientToken),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toContain("lab-result.pdf");
   });
 });

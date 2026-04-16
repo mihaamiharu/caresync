@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { db } from "../db";
 import {
@@ -556,4 +556,123 @@ medicalRecordsRoute.openapi(uploadAttachmentRoute, async (c) => {
     .returning();
 
   return c.json(attachment, 201);
+});
+
+// ─── GET /medical-records/:id/attachments/:attachmentId/download ──────────────
+
+const downloadAttachmentRoute = createRoute({
+  method: "get",
+  path: "/medical-records/{id}/attachments/{attachmentId}/download",
+  tags: ["Medical Records"],
+  summary: "Download a file attachment (auth + ownership required)",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.string().uuid(),
+      attachmentId: z.string().uuid(),
+    }),
+  },
+  responses: {
+    200: { description: "File stream" },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Forbidden",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Record or attachment not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+medicalRecordsRoute.openapi(downloadAttachmentRoute, async (c) => {
+  const userId = c.get("userId");
+  const role = c.get("userRole");
+  const { id, attachmentId } = c.req.valid("param");
+
+  // Fetch record (same join as GET/:id)
+  const [row] = await db
+    .select({
+      id: medicalRecords.id,
+      patientId: medicalRecords.patientId,
+      doctorId: medicalRecords.doctorId,
+      appointmentId: medicalRecords.appointmentId,
+      diagnosis: medicalRecords.diagnosis,
+      symptoms: medicalRecords.symptoms,
+      notes: medicalRecords.notes,
+      createdAt: medicalRecords.createdAt,
+      appointmentDate: appointments.appointmentDate,
+      startTime: appointments.startTime,
+      appointmentType: appointments.type,
+      appointmentStatus: appointments.status,
+      doctorSpecialization: doctors.specialization,
+      doctorFirstName: users.firstName,
+      doctorLastName: users.lastName,
+    })
+    .from(medicalRecords)
+    .innerJoin(appointments, eq(appointments.id, medicalRecords.appointmentId))
+    .innerJoin(doctors, eq(doctors.id, medicalRecords.doctorId))
+    .innerJoin(users, eq(users.id, doctors.userId))
+    .where(eq(medicalRecords.id, id))
+    .limit(1);
+
+  if (!row) {
+    return c.json({ message: "Medical record not found" }, 404);
+  }
+
+  // Ownership check
+  if (role === "patient") {
+    const [patient] = await db
+      .select({ id: patients.id })
+      .from(patients)
+      .where(eq(patients.userId, userId))
+      .limit(1);
+
+    if (!patient || patient.id !== row.patientId) {
+      return c.json({ message: "Forbidden" }, 403);
+    }
+  } else if (role === "doctor") {
+    const [doctor] = await db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(eq(doctors.userId, userId))
+      .limit(1);
+
+    if (!doctor || doctor.id !== row.doctorId) {
+      return c.json({ message: "Forbidden" }, 403);
+    }
+  }
+  // admin: no ownership check
+
+  // Fetch attachment
+  const [attachment] = await db
+    .select()
+    .from(medicalRecordAttachments)
+    .where(
+      and(
+        eq(medicalRecordAttachments.id, attachmentId),
+        eq(medicalRecordAttachments.medicalRecordId, row.id)
+      )
+    )
+    .limit(1);
+
+  if (!attachment) {
+    return c.json({ message: "Attachment not found" }, 404);
+  }
+
+  // Stream file
+  const diskPath = path.join(process.cwd(), attachment.fileUrl);
+  const buffer = await readFile(diskPath);
+
+  return new Response(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type": attachment.fileType,
+      "Content-Disposition": `attachment; filename="${attachment.fileName}"`,
+    },
+  });
 });
