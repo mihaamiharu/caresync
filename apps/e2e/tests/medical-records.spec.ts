@@ -239,6 +239,422 @@ test.describe("Medical Records — API", () => {
   });
 });
 
+// ─── File attachment helpers ───────────────────────────────────────────────────
+
+/**
+ * Creates a small in-memory text file and returns it as a {name, buffer, mimeType}.
+ * Playwright's locator.setInputFiles() accepts file paths OR buffer metadata, so we
+ * write the temp file to disk first – that is what the browser's file input expects.
+ */
+async function makeTempFile(
+  name: string,
+  content: string,
+  mimeType: string
+): Promise<{ filePath: string; mimeType: string }> {
+  const tmpDir = process.env.TEMP || "/tmp";
+  const filePath = `${tmpDir}/${name}`;
+  const { writeFile } = await import("fs/promises");
+  await writeFile(filePath, content);
+  return { filePath, mimeType };
+}
+
+// ─── API tests ────────────────────────────────────────────────────────────────
+
+test.describe("Medical Record Attachments — API", () => {
+  let adminToken: string;
+  let doctorToken: string;
+  let patientToken: string;
+  let recordId: string;
+  let doctorData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+  };
+
+  test.beforeAll(async ({ request }) => {
+    test.skip(!config.adminEmail, "Set ADMIN_EMAIL + ADMIN_PASSWORD env vars");
+    adminToken = await getAdminToken(request);
+
+    // Create doctor + department
+    const deptRes = await request.post(`${config.apiUrl}/api/v1/departments`, {
+      data: { name: `MR Attch Dept ${faker.string.alphanumeric(6)}` },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const dept = await deptRes.json();
+
+    doctorData = {
+      firstName: faker.person.firstName(),
+      lastName: faker.person.lastName(),
+      email: faker.internet.email().toLowerCase(),
+      password: "Password123!",
+    };
+
+    const doctorRes = await request.post(`${config.apiUrl}/api/v1/doctors`, {
+      data: {
+        ...doctorData,
+        departmentId: dept.id,
+        specialization: "General Medicine",
+        licenseNumber: faker.string.alphanumeric(10).toUpperCase(),
+      },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const doctor = await doctorRes.json();
+
+    const doctorLoginRes = await request.post(
+      `${config.apiUrl}/api/v1/auth/login`,
+      { data: { email: doctorData.email, password: doctorData.password } }
+    );
+    doctorToken = (await doctorLoginRes.json()).accessToken;
+
+    // Register patient
+    const patientEmail = faker.internet.email().toLowerCase();
+    const patientRes = await request.post(
+      `${config.apiUrl}/api/v1/auth/register`,
+      {
+        data: {
+          role: "patient",
+          email: patientEmail,
+          password: "Password123!",
+          firstName: faker.person.firstName(),
+          lastName: faker.person.lastName(),
+        },
+      }
+    );
+    patientToken = (await patientRes.json()).accessToken;
+
+    // Create a completed appointment and medical record
+    const nextMonday = getNextMonday();
+
+    const slotsRes = await request.get(
+      `${config.apiUrl}/api/v1/doctors/${doctor.id}/available-slots?date=${nextMonday}`,
+      { headers: { Authorization: `Bearer ${patientToken}` } }
+    );
+    const slots: string[] = await slotsRes.json();
+    expect(slots.length).toBeGreaterThan(0);
+
+    const apptRes = await request.post(`${config.apiUrl}/api/v1/appointments`, {
+      data: {
+        doctorId: doctor.id,
+        appointmentDate: nextMonday,
+        startTime: slots[0],
+        type: "consultation",
+        reason: "E2E attachment test",
+      },
+      headers: { Authorization: `Bearer ${patientToken}` },
+    });
+    const appt = await apptRes.json();
+
+    for (const status of ["confirmed", "in-progress", "completed"] as const) {
+      await request.patch(
+        `${config.apiUrl}/api/v1/appointments/${appt.id}/status`,
+        {
+          data: { status },
+          headers: { Authorization: `Bearer ${doctorToken}` },
+        }
+      );
+    }
+
+    const mrRes = await request.post(
+      `${config.apiUrl}/api/v1/medical-records`,
+      {
+        data: {
+          appointmentId: appt.id,
+          diagnosis: "E2E Attachment Test Diagnosis",
+          symptoms: "None",
+          notes: "Test record for attachment flow",
+        },
+        headers: { Authorization: `Bearer ${doctorToken}` },
+      }
+    );
+    const mr = await mrRes.json();
+    recordId = mr.id;
+  });
+
+  test("MR-ATT-A1: POST uploads a file attachment and GET returns it", async ({
+    request,
+  }) => {
+    // Create a temp text file
+    const { filePath, mimeType } = await makeTempFile(
+      `test-attachment-${Date.now()}.txt`,
+      "Lab result: Normal blood panel",
+      "text/plain"
+    );
+
+    const uploadRes = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${doctorToken}` },
+        multipart: {
+          file: {
+            name: `test-attachment-${Date.now()}.txt`,
+            mimeType,
+            buffer: Buffer.from("Lab result: Normal blood panel"),
+          },
+        },
+      }
+    );
+
+    expect(uploadRes.status()).toBe(201);
+    const attachment = await uploadRes.json();
+    expect(attachment.medicalRecordId).toBe(recordId);
+    expect(attachment.fileName).toMatch(/test-attachment.*\.txt/);
+    expect(attachment.fileUrl).toMatch(/^\/uploads\/attachments\//);
+    expect(attachment.fileType).toBe("text/plain");
+    expect(attachment.fileSize).toBeGreaterThan(0);
+
+    // GET returns the attachment
+    const listRes = await request.get(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      { headers: { Authorization: `Bearer ${patientToken}` } }
+    );
+    expect(listRes.status()).toBe(200);
+    const list: unknown[] = await listRes.json();
+    expect(list.some((a: any) => a.id === attachment.id)).toBe(true);
+  });
+
+  test("MR-ATT-A2: GET /attachments/:id returns a specific attachment", async ({
+    request,
+  }) => {
+    // Upload first
+    const uploadRes = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${doctorToken}` },
+        multipart: {
+          file: {
+            name: `single-attachment-${Date.now()}.pdf`,
+            mimeType: "application/pdf",
+            buffer: Buffer.from("Mock PDF content"),
+          },
+        },
+      }
+    );
+    expect(uploadRes.status()).toBe(201);
+    const attachment = await uploadRes.json();
+
+    // Fetch by ID
+    const getRes = await request.get(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments/${attachment.id}`,
+      { headers: { Authorization: `Bearer ${patientToken}` } }
+    );
+    expect(getRes.status()).toBe(200);
+    const fetched = await getRes.json();
+    expect(fetched.id).toBe(attachment.id);
+    expect(fetched.fileName).toBe(attachment.fileName);
+  });
+
+  test("MR-ATT-A3: DELETE removes an attachment", async ({ request }) => {
+    // Upload
+    const uploadRes = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${doctorToken}` },
+        multipart: {
+          file: {
+            name: `delete-me-${Date.now()}.txt`,
+            mimeType: "text/plain",
+            buffer: Buffer.from("To be deleted"),
+          },
+        },
+      }
+    );
+    expect(uploadRes.status()).toBe(201);
+    const attachment = await uploadRes.json();
+
+    // Delete
+    const delRes = await request.delete(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments/${attachment.id}`,
+      { headers: { Authorization: `Bearer ${doctorToken}` } }
+    );
+    expect(delRes.status()).toBe(200);
+
+    // Confirm gone
+    const getRes = await request.get(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments/${attachment.id}`,
+      { headers: { Authorization: `Bearer ${doctorToken}` } }
+    );
+    expect(getRes.status()).toBe(404);
+  });
+
+  test("MR-ATT-A4: POST attachment returns 401 without auth", async ({
+    request,
+  }) => {
+    const res = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        multipart: {
+          file: {
+            name: "test.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("x"),
+          },
+        },
+      }
+    );
+    expect(res.status()).toBe(401);
+  });
+
+  test("MR-ATT-A5: POST attachment returns 403 for non-doctor (patient)", async ({
+    request,
+  }) => {
+    const res = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${patientToken}` },
+        multipart: {
+          file: {
+            name: "test.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("x"),
+          },
+        },
+      }
+    );
+    expect(res.status()).toBe(403);
+  });
+
+  test("MR-ATT-A6: POST attachment returns 404 for non-existent record", async ({
+    request,
+  }) => {
+    const fakeId = "00000000-0000-4000-8000-000000000000";
+    const res = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${fakeId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${doctorToken}` },
+        multipart: {
+          file: {
+            name: "test.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("x"),
+          },
+        },
+      }
+    );
+    expect(res.status()).toBe(404);
+  });
+
+  test("MR-ATT-A7: DELETE attachment returns 403 for non-owning doctor", async ({
+    request,
+  }) => {
+    // Upload as the real doctor
+    const uploadRes = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${doctorToken}` },
+        multipart: {
+          file: {
+            name: "owned.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("x"),
+          },
+        },
+      }
+    );
+    const attachment = await uploadRes.json();
+
+    // Create another doctor
+    const deptRes = await request.post(`${config.apiUrl}/api/v1/departments`, {
+      data: { name: `Other Dept ${faker.string.alphanumeric(6)}` },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const otherDept = await deptRes.json();
+
+    const otherDocData = {
+      firstName: faker.person.firstName(),
+      lastName: faker.person.lastName(),
+      email: faker.internet.email().toLowerCase(),
+      password: "Password123!",
+    };
+    const otherDocRes = await request.post(`${config.apiUrl}/api/v1/doctors`, {
+      data: {
+        ...otherDocData,
+        departmentId: otherDept.id,
+        specialization: "Surgery",
+        licenseNumber: faker.string.alphanumeric(10).toUpperCase(),
+      },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const otherDoc = await otherDocRes.json();
+
+    const otherLoginRes = await request.post(
+      `${config.apiUrl}/api/v1/auth/login`,
+      {
+        data: { email: otherDocData.email, password: otherDocData.password },
+      }
+    );
+    const otherToken = (await otherLoginRes.json()).accessToken;
+
+    // That other doctor tries to delete
+    const delRes = await request.delete(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments/${attachment.id}`,
+      { headers: { Authorization: `Bearer ${otherToken}` } }
+    );
+    expect(delRes.status()).toBe(403);
+  });
+
+  test("MR-ATT-A8: POST returns 400 for disallowed file type", async ({
+    request,
+  }) => {
+    const res = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${doctorToken}` },
+        multipart: {
+          file: {
+            name: "malicious.exe",
+            mimeType: "application/x-executable",
+            buffer: Buffer.from("binary"),
+          },
+        },
+      }
+    );
+    expect(res.status()).toBe(400);
+  });
+
+  test("MR-ATT-A9: GET attachment returns 403 for unauthorized patient", async ({
+    request,
+  }) => {
+    // Create a second patient with no ties to this record
+    const otherPatientRes = await request.post(
+      `${config.apiUrl}/api/v1/auth/register`,
+      {
+        data: {
+          role: "patient",
+          email: faker.internet.email().toLowerCase(),
+          password: "Password123!",
+          firstName: faker.person.firstName(),
+          lastName: faker.person.lastName(),
+        },
+      }
+    );
+    const otherToken = (await otherPatientRes.json()).accessToken;
+
+    // Upload an attachment first
+    const uploadRes = await request.post(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments`,
+      {
+        headers: { Authorization: `Bearer ${doctorToken}` },
+        multipart: {
+          file: {
+            name: "secret.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from("secret"),
+          },
+        },
+      }
+    );
+    const attachment = await uploadRes.json();
+
+    // Other patient tries to GET it
+    const getRes = await request.get(
+      `${config.apiUrl}/api/v1/medical-records/${recordId}/attachments/${attachment.id}`,
+      { headers: { Authorization: `Bearer ${otherToken}` } }
+    );
+    expect(getRes.status()).toBe(403);
+  });
+});
+
 // ─── UI happy-path ────────────────────────────────────────────────────────────
 
 test.describe("Medical Records — UI happy-path", () => {

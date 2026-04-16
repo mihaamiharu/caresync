@@ -1,7 +1,10 @@
 import { useLoaderData, Link } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import { useState, useCallback } from "react";
 import { medicalRecordsApi } from "@/lib/api-client";
-import type { MedicalRecord } from "@caresync/shared";
+import { attachmentsApi } from "@/lib/attachments-api";
+import type { MedicalRecord, MedicalRecordAttachment } from "@caresync/shared";
+import { AttachmentList, FileUpload } from "@/components/attachments";
 
 // ─── Loader ────────────────────────────────────────────────────────────────────
 
@@ -10,7 +13,9 @@ export async function medicalRecordDetailLoader({
 }: LoaderFunctionArgs) {
   const { id } = params;
   if (!id) throw new Response("Not found", { status: 404 });
-  return medicalRecordsApi.get(id);
+  const record = await medicalRecordsApi.get(id);
+  const attachments = await attachmentsApi.list(id);
+  return { record, attachments };
 }
 
 // ─── Detail row helper ─────────────────────────────────────────────────────────
@@ -35,11 +40,30 @@ function DetailRow({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export function MedicalRecordDetailPage() {
-  const record = useLoaderData() as MedicalRecord;
+  const { record, attachments: initialAttachments } = useLoaderData() as {
+    record: MedicalRecord;
+    attachments: MedicalRecordAttachment[];
+  };
+  const [attachments, setAttachments] = useState(initialAttachments);
 
   const doctorName = record.doctor
     ? `Dr. ${record.doctor.user.firstName} ${record.doctor.user.lastName}`
     : "—";
+
+  const handleUpload = useCallback(
+    async (file: File) => {
+      await attachmentsApi.upload(record.id, file);
+      // Refresh attachments list
+      const updated = await attachmentsApi.list(record.id);
+      setAttachments(updated);
+    },
+    [record.id]
+  );
+
+  const handleDelete = useCallback(async (attachmentId: string) => {
+    await attachmentsApi.delete(attachmentId);
+    setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+  }, []);
 
   return (
     <div data-testid="medical-record-detail-page">
@@ -147,6 +171,21 @@ export function MedicalRecordDetailPage() {
             </dl>
           </div>
         )}
+
+        {/* Attachments */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="mb-4 text-base font-semibold text-foreground">
+            Attachments
+          </h2>
+          <div className="space-y-4">
+            <FileUpload
+              onUpload={handleUpload}
+              accept="image/*,.pdf,.doc,.docx,.txt"
+              maxSizeMB={10}
+            />
+            <AttachmentList attachments={attachments} onDelete={handleDelete} />
+          </div>
+        </div>
       </div>
     </div>
   );

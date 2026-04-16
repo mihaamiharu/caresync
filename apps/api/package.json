@@ -25,14 +25,18 @@
     "drizzle-orm": "^0.38",
     "hono": "^4.7",
     "jsonwebtoken": "^9.0",
+    "multer": "^1.4.5-lts.1",
     "pg": "^8.13",
+    "uuid": "^11.0",
     "zod": "^3.24"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4",
     "@types/jsonwebtoken": "^9.0",
+    "@types/multer": "^1.4",
     "@types/node": "^22",
     "@types/pg": "^8.11",
+    "@types/uuid": "^10",
     "drizzle-kit": "^0.30",
     "tsx": "^4.19",
     "typescript": "^5.7",
