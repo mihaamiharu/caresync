@@ -10,6 +10,11 @@ vi.mock("../db", () => ({
   },
 }));
 
+vi.mock("node:fs/promises", () => ({
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { db } from "../db";
 
 const BASE_URL = "/api/v1/medical-records";
@@ -460,5 +465,197 @@ describe("GET /medical-records/:id", () => {
     expect(body.attachments[0].id).toBe(ATTACHMENT_ID);
     expect(body.attachments[0].fileName).toBe("lab-result.pdf");
     expect(body.attachments[0].fileSize).toBe(12345);
+  });
+});
+
+// ─── POST /medical-records/:id/attachments ────────────────────────────────────
+
+describe("POST /medical-records/:id/attachments", () => {
+  const UPLOAD_URL = `${BASE_URL}/${RECORD_ID}/attachments`;
+
+  function makeFile(
+    name: string,
+    type: string,
+    sizeBytes: number = 1024
+  ): File {
+    return new File([new Uint8Array(sizeBytes)], name, { type });
+  }
+
+  function makeUploadForm(file: File): FormData {
+    const form = new FormData();
+    form.append("file", file);
+    return form;
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns 401 when no auth header", async () => {
+    const res = await app.request(UPLOAD_URL, { method: "POST" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by patient", async () => {
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(patientToken),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when called by admin", async () => {
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when doctor profile not found", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]) as any);
+
+    const form = makeUploadForm(makeFile("report.pdf", "application/pdf"));
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(doctorToken),
+      body: form,
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.message).toMatch(/doctor profile not found/i);
+  });
+
+  it("returns 404 when medical record not found", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(makeSelectChain([]) as any);
+
+    const form = makeUploadForm(makeFile("report.pdf", "application/pdf"));
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(doctorToken),
+      body: form,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when doctor does not own the record", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockOtherDoctor]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ id: RECORD_ID, doctorId: DOCTOR_ID }]) as any
+      );
+
+    const form = makeUploadForm(makeFile("report.pdf", "application/pdf"));
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(otherDoctorToken),
+      body: form,
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 when no file is provided", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ id: RECORD_ID, doctorId: DOCTOR_ID }]) as any
+      );
+
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(doctorToken),
+      body: new FormData(),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toMatch(/no file/i);
+  });
+
+  it("returns 400 when file type is not pdf/jpg/png", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ id: RECORD_ID, doctorId: DOCTOR_ID }]) as any
+      );
+
+    const form = makeUploadForm(
+      makeFile("virus.exe", "application/octet-stream")
+    );
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(doctorToken),
+      body: form,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toMatch(/invalid file type/i);
+  });
+
+  it("returns 400 when file exceeds 10MB", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ id: RECORD_ID, doctorId: DOCTOR_ID }]) as any
+      );
+
+    const TEN_MB_PLUS_ONE = 10 * 1024 * 1024 + 1;
+    const form = makeUploadForm(
+      makeFile("big.pdf", "application/pdf", TEN_MB_PLUS_ONE)
+    );
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(doctorToken),
+      body: form,
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toMatch(/too large/i);
+  });
+
+  it("returns 201 with attachment on valid PDF upload", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ id: RECORD_ID, doctorId: DOCTOR_ID }]) as any
+      );
+    vi.mocked(db.insert).mockReturnValueOnce(
+      makeInsertWithReturning([mockAttachment]) as any
+    );
+
+    const form = makeUploadForm(makeFile("lab-result.pdf", "application/pdf"));
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(doctorToken),
+      body: form,
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.id).toBe(ATTACHMENT_ID);
+    expect(body.medicalRecordId).toBe(RECORD_ID);
+    expect(body.fileName).toBe("lab-result.pdf");
+    expect(body.fileType).toBe("application/pdf");
+  });
+
+  it("returns 201 with attachment on valid JPG upload", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ id: RECORD_ID, doctorId: DOCTOR_ID }]) as any
+      );
+    vi.mocked(db.insert).mockReturnValueOnce(
+      makeInsertWithReturning([
+        { ...mockAttachment, fileName: "xray.jpg", fileType: "image/jpeg" },
+      ]) as any
+    );
+
+    const form = makeUploadForm(makeFile("xray.jpg", "image/jpeg"));
+    const res = await app.request(UPLOAD_URL, {
+      method: "POST",
+      headers: bearer(doctorToken),
+      body: form,
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.fileType).toBe("image/jpeg");
   });
 });

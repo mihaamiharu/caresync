@@ -1,5 +1,8 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq, desc, and } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { db } from "../db";
 import {
   medicalRecords,
@@ -435,4 +438,122 @@ medicalRecordsRoute.openapi(getMedicalRecordRoute, async (c) => {
     },
     200
   );
+});
+
+// ─── POST /medical-records/:id/attachments (doctor only) ──────────────────────
+
+const ALLOWED_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const uploadAttachmentRoute = createRoute({
+  method: "post",
+  path: "/medical-records/{id}/attachments",
+  tags: ["Medical Records"],
+  summary: "Upload a file attachment to a medical record (doctor only)",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireRole("doctor")] as const,
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+  },
+  responses: {
+    201: {
+      description: "Uploaded attachment",
+      content: { "application/json": { schema: attachmentSchema } },
+    },
+    400: {
+      description: "Validation error",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Forbidden",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Medical record not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+medicalRecordsRoute.openapi(uploadAttachmentRoute, async (c) => {
+  const userId = c.get("userId");
+  const { id } = c.req.valid("param");
+
+  // Resolve doctor
+  const [doctor] = await db
+    .select({ id: doctors.id })
+    .from(doctors)
+    .where(eq(doctors.userId, userId))
+    .limit(1);
+
+  if (!doctor) {
+    return c.json({ message: "Doctor profile not found" }, 403);
+  }
+
+  // Fetch record
+  const [record] = await db
+    .select({ id: medicalRecords.id, doctorId: medicalRecords.doctorId })
+    .from(medicalRecords)
+    .where(eq(medicalRecords.id, id))
+    .limit(1);
+
+  if (!record) {
+    return c.json({ message: "Medical record not found" }, 404);
+  }
+
+  // Ownership check
+  if (record.doctorId !== doctor.id) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
+  // Parse file
+  const body = await c.req.parseBody();
+  const file = body["file"];
+
+  if (!file || typeof file === "string") {
+    return c.json({ message: "No file provided" }, 400);
+  }
+
+  const f = file as File;
+
+  // Validate MIME type
+  if (!ALLOWED_MIME_TYPES.includes(f.type)) {
+    return c.json(
+      { message: "Invalid file type. Allowed: pdf, jpg, png" },
+      400
+    );
+  }
+
+  // Validate size
+  if (f.size > MAX_FILE_SIZE) {
+    return c.json({ message: "File too large. Maximum size is 10MB" }, 400);
+  }
+
+  // Write to disk
+  const ext = f.name.split(".").pop() ?? "bin";
+  const filename = `${randomUUID()}.${ext}`;
+  const uploadDir = path.join(process.cwd(), "uploads", "medical-records");
+  await mkdir(uploadDir, { recursive: true });
+  const buffer = Buffer.from(await f.arrayBuffer());
+  await writeFile(path.join(uploadDir, filename), buffer);
+
+  const fileUrl = `/uploads/medical-records/${filename}`;
+
+  // Insert DB row
+  const [attachment] = await db
+    .insert(medicalRecordAttachments)
+    .values({
+      medicalRecordId: record.id,
+      fileName: f.name,
+      fileUrl,
+      fileType: f.type,
+      fileSize: f.size,
+    })
+    .returning();
+
+  return c.json(attachment, 201);
 });
