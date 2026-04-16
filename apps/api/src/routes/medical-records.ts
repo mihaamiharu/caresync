@@ -3,6 +3,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { db } from "../db";
 import {
   medicalRecords,
+  medicalRecordAttachments,
   appointments,
   patients,
   doctors,
@@ -37,6 +38,15 @@ const appointmentSummarySchema = z.object({
   status: z.string(),
 });
 
+const attachmentSchema = z.object({
+  id: z.string(),
+  medicalRecordId: z.string(),
+  fileName: z.string(),
+  fileUrl: z.string(),
+  fileType: z.string(),
+  fileSize: z.number(),
+});
+
 const medicalRecordSchema = z.object({
   id: z.string(),
   appointmentId: z.string(),
@@ -48,6 +58,7 @@ const medicalRecordSchema = z.object({
   createdAt: z.string(),
   appointment: appointmentSummarySchema.optional(),
   doctor: doctorSummarySchema.optional(),
+  attachments: z.array(attachmentSchema).optional(),
 });
 
 // ─── POST /medical-records (doctor only) ──────────────────────────────────────
@@ -390,6 +401,11 @@ medicalRecordsRoute.openapi(getMedicalRecordRoute, async (c) => {
   }
   // admin: no ownership check
 
+  const attachments = await db
+    .select()
+    .from(medicalRecordAttachments)
+    .where(eq(medicalRecordAttachments.medicalRecordId, row.id));
+
   return c.json(
     {
       id: row.id,
@@ -415,6 +431,7 @@ medicalRecordsRoute.openapi(getMedicalRecordRoute, async (c) => {
           lastName: row.doctorLastName,
         },
       },
+      attachments,
     },
     200
   );

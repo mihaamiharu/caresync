@@ -50,11 +50,21 @@ const PATIENT_ID = "b1c2d3e4-0000-4000-8000-000000000003";
 const OTHER_PATIENT_ID = "b1c2d3e4-0000-4000-8000-000000000004";
 const APPOINTMENT_ID = "b1c2d3e4-0000-4000-8000-000000000005";
 const RECORD_ID = "b1c2d3e4-0000-4000-8000-000000000006";
+const ATTACHMENT_ID = "b1c2d3e4-0000-4000-8000-000000000007";
 
 const mockDoctor = { id: DOCTOR_ID };
 const mockOtherDoctor = { id: OTHER_DOCTOR_ID };
 const mockPatient = { id: PATIENT_ID };
 const mockOtherPatient = { id: OTHER_PATIENT_ID };
+
+const mockAttachment = {
+  id: ATTACHMENT_ID,
+  medicalRecordId: RECORD_ID,
+  fileName: "lab-result.pdf",
+  fileUrl: "/uploads/medical-records/some-uuid.pdf",
+  fileType: "application/pdf",
+  fileSize: 12345,
+};
 
 const mockCompletedAppointment = {
   id: APPOINTMENT_ID,
@@ -123,6 +133,13 @@ function makeInsertWithReturning(result: unknown[]) {
   const returning = vi.fn().mockResolvedValue(result);
   const values = vi.fn().mockReturnValue({ returning });
   return { values };
+}
+
+// Resolves on .where() directly (no .limit()) — used for attachment queries
+function makeSelectWhereChain(result: unknown[]) {
+  const where = vi.fn().mockResolvedValue(result);
+  const from = vi.fn().mockReturnValue({ where });
+  return { from };
 }
 
 // ─── POST /medical-records ────────────────────────────────────────────────────
@@ -366,9 +383,9 @@ describe("GET /medical-records/:id", () => {
   });
 
   it("admin can access any record", async () => {
-    vi.mocked(db.select).mockReturnValueOnce(
-      makeJoinChain([mockRecordRow]) as any
-    );
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
+      .mockReturnValueOnce(makeSelectWhereChain([]) as any); // attachments query
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(adminToken),
@@ -382,7 +399,8 @@ describe("GET /medical-records/:id", () => {
   it("doctor can access their own record", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
-      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any);
+      .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
+      .mockReturnValueOnce(makeSelectWhereChain([]) as any); // attachments query
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(doctorToken),
@@ -395,7 +413,7 @@ describe("GET /medical-records/:id", () => {
   it("doctor gets 403 for another doctor's record", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any) // record found
-      .mockReturnValueOnce(makeSelectChain([mockOtherDoctor]) as any); // different doctor
+      .mockReturnValueOnce(makeSelectChain([mockOtherDoctor]) as any); // different doctor — 403 before attachments
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(otherDoctorToken),
@@ -406,7 +424,8 @@ describe("GET /medical-records/:id", () => {
   it("patient can access their own record", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
-      .mockReturnValueOnce(makeSelectChain([mockPatient]) as any);
+      .mockReturnValueOnce(makeSelectChain([mockPatient]) as any)
+      .mockReturnValueOnce(makeSelectWhereChain([]) as any); // attachments query
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(patientToken),
@@ -419,11 +438,27 @@ describe("GET /medical-records/:id", () => {
   it("patient gets 403 for another patient's record", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any) // record found
-      .mockReturnValueOnce(makeSelectChain([mockOtherPatient]) as any); // different patient
+      .mockReturnValueOnce(makeSelectChain([mockOtherPatient]) as any); // different patient — 403 before attachments
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(otherPatientToken),
     });
     expect(res.status).toBe(403);
+  });
+
+  it("response includes attachments array", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
+      .mockReturnValueOnce(makeSelectWhereChain([mockAttachment]) as any); // attachments query
+
+    const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
+      headers: bearer(adminToken),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.attachments).toHaveLength(1);
+    expect(body.attachments[0].id).toBe(ATTACHMENT_ID);
+    expect(body.attachments[0].fileName).toBe("lab-result.pdf");
+    expect(body.attachments[0].fileSize).toBe(12345);
   });
 });
