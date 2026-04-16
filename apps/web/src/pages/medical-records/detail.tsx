@@ -1,7 +1,10 @@
-import { useLoaderData, Link } from "react-router";
+import { useRef, useState } from "react";
+import { useLoaderData, Link, useRevalidator } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import { toast } from "sonner";
 import { medicalRecordsApi } from "@/lib/api-client";
-import type { MedicalRecord } from "@caresync/shared";
+import { useAuthStore } from "@/stores/auth-store";
+import type { MedicalRecord, MedicalRecordAttachment } from "@caresync/shared";
 
 // ─── Loader ────────────────────────────────────────────────────────────────────
 
@@ -32,14 +35,172 @@ function DetailRow({
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileIcon(fileType: string): string {
+  if (fileType === "application/pdf") return "📄";
+  if (fileType.startsWith("image/")) return "🖼️";
+  return "📎";
+}
+
+// ─── AttachmentsCard ──────────────────────────────────────────────────────────
+
+function AttachmentsCard({
+  record,
+  userRole,
+  onUpload,
+}: {
+  record: MedicalRecord;
+  userRole: string;
+  onUpload: (file: File) => Promise<void>;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const attachments: MedicalRecordAttachment[] = record.attachments ?? [];
+  const isDoctor = userRole === "doctor";
+
+  async function processFiles(files: FileList) {
+    setUploadError(null);
+    for (const file of Array.from(files)) {
+      try {
+        await onUpload(file);
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message ?? "Upload failed";
+        toast.error(msg);
+        setUploadError(msg);
+      }
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragging(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
+  }
+
+  async function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      await processFiles(e.target.files);
+      e.target.value = "";
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-6">
+      <h2 className="mb-4 text-base font-semibold text-foreground">
+        Attachments
+      </h2>
+
+      {/* File list */}
+      {attachments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No attachments yet.</p>
+      ) : (
+        <ul className="mb-4 divide-y divide-border">
+          {attachments.map((att) => (
+            <li key={att.id} className="flex items-center justify-between py-2">
+              <span className="flex items-center gap-2 text-sm text-foreground">
+                <span aria-hidden="true">{fileIcon(att.fileType)}</span>
+                <span>{att.fileName}</span>
+                <span className="text-muted-foreground">
+                  ({formatBytes(att.fileSize)})
+                </span>
+              </span>
+              <a
+                href={`/api/v1/medical-records/${record.id}/attachments/${att.id}/download`}
+                className="text-sm text-primary hover:underline"
+                download={att.fileName}
+              >
+                Download
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Upload zone — doctor only */}
+      {isDoctor && (
+        <>
+          <div
+            data-testid="upload-zone"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+            className={`mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
+              dragging
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50"
+            }`}
+          >
+            <p className="text-sm text-muted-foreground">
+              Drag & drop files here, or{" "}
+              <span className="text-primary">browse</span>
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              PDF, JPG, PNG — max 10 MB
+            </p>
+            <input
+              ref={inputRef}
+              data-testid="file-input"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={handleInputChange}
+            />
+          </div>
+          {uploadError && (
+            <p
+              data-testid="upload-error"
+              className="mt-2 text-sm text-destructive"
+            >
+              {uploadError}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export function MedicalRecordDetailPage() {
   const record = useLoaderData() as MedicalRecord;
+  const revalidator = useRevalidator();
+  const role = useAuthStore((s) => s.user?.role ?? "");
 
   const doctorName = record.doctor
     ? `Dr. ${record.doctor.user.firstName} ${record.doctor.user.lastName}`
     : "—";
+
+  async function handleUpload(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    await medicalRecordsApi.uploadAttachment(record.id, formData);
+    revalidator.revalidate();
+  }
 
   return (
     <div data-testid="medical-record-detail-page">
@@ -147,6 +308,15 @@ export function MedicalRecordDetailPage() {
             </dl>
           </div>
         )}
+      </div>
+
+      {/* Attachments — full width */}
+      <div className="mt-6">
+        <AttachmentsCard
+          record={record}
+          userRole={role}
+          onUpload={handleUpload}
+        />
       </div>
     </div>
   );

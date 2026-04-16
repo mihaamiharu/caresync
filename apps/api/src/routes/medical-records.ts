@@ -1,8 +1,12 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq, desc, and } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { db } from "../db";
 import {
   medicalRecords,
+  medicalRecordAttachments,
   appointments,
   patients,
   doctors,
@@ -37,6 +41,15 @@ const appointmentSummarySchema = z.object({
   status: z.string(),
 });
 
+const attachmentSchema = z.object({
+  id: z.string(),
+  medicalRecordId: z.string(),
+  fileName: z.string(),
+  fileUrl: z.string(),
+  fileType: z.string(),
+  fileSize: z.number(),
+});
+
 const medicalRecordSchema = z.object({
   id: z.string(),
   appointmentId: z.string(),
@@ -48,6 +61,7 @@ const medicalRecordSchema = z.object({
   createdAt: z.string(),
   appointment: appointmentSummarySchema.optional(),
   doctor: doctorSummarySchema.optional(),
+  attachments: z.array(attachmentSchema).optional(),
 });
 
 // ─── POST /medical-records (doctor only) ──────────────────────────────────────
@@ -390,6 +404,11 @@ medicalRecordsRoute.openapi(getMedicalRecordRoute, async (c) => {
   }
   // admin: no ownership check
 
+  const attachments = await db
+    .select()
+    .from(medicalRecordAttachments)
+    .where(eq(medicalRecordAttachments.medicalRecordId, row.id));
+
   return c.json(
     {
       id: row.id,
@@ -415,7 +434,245 @@ medicalRecordsRoute.openapi(getMedicalRecordRoute, async (c) => {
           lastName: row.doctorLastName,
         },
       },
+      attachments,
     },
     200
   );
+});
+
+// ─── POST /medical-records/:id/attachments (doctor only) ──────────────────────
+
+const ALLOWED_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const uploadAttachmentRoute = createRoute({
+  method: "post",
+  path: "/medical-records/{id}/attachments",
+  tags: ["Medical Records"],
+  summary: "Upload a file attachment to a medical record (doctor only)",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireRole("doctor")] as const,
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+  },
+  responses: {
+    201: {
+      description: "Uploaded attachment",
+      content: { "application/json": { schema: attachmentSchema } },
+    },
+    400: {
+      description: "Validation error",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Forbidden",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Medical record not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+medicalRecordsRoute.openapi(uploadAttachmentRoute, async (c) => {
+  const userId = c.get("userId");
+  const { id } = c.req.valid("param");
+
+  // Resolve doctor
+  const [doctor] = await db
+    .select({ id: doctors.id })
+    .from(doctors)
+    .where(eq(doctors.userId, userId))
+    .limit(1);
+
+  if (!doctor) {
+    return c.json({ message: "Doctor profile not found" }, 403);
+  }
+
+  // Fetch record
+  const [record] = await db
+    .select({ id: medicalRecords.id, doctorId: medicalRecords.doctorId })
+    .from(medicalRecords)
+    .where(eq(medicalRecords.id, id))
+    .limit(1);
+
+  if (!record) {
+    return c.json({ message: "Medical record not found" }, 404);
+  }
+
+  // Ownership check
+  if (record.doctorId !== doctor.id) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
+  // Parse file
+  const body = await c.req.parseBody();
+  const file = body["file"];
+
+  if (!file || typeof file === "string") {
+    return c.json({ message: "No file provided" }, 400);
+  }
+
+  const f = file as File;
+
+  // Validate MIME type
+  if (!ALLOWED_MIME_TYPES.includes(f.type)) {
+    return c.json(
+      { message: "Invalid file type. Allowed: pdf, jpg, png" },
+      400
+    );
+  }
+
+  // Validate size
+  if (f.size > MAX_FILE_SIZE) {
+    return c.json({ message: "File too large. Maximum size is 10MB" }, 400);
+  }
+
+  // Write to disk
+  const ext = f.name.split(".").pop() ?? "bin";
+  const filename = `${randomUUID()}.${ext}`;
+  const uploadDir = path.join(process.cwd(), "uploads", "medical-records");
+  await mkdir(uploadDir, { recursive: true });
+  const buffer = Buffer.from(await f.arrayBuffer());
+  await writeFile(path.join(uploadDir, filename), buffer);
+
+  const fileUrl = `/uploads/medical-records/${filename}`;
+
+  // Insert DB row
+  const [attachment] = await db
+    .insert(medicalRecordAttachments)
+    .values({
+      medicalRecordId: record.id,
+      fileName: f.name,
+      fileUrl,
+      fileType: f.type,
+      fileSize: f.size,
+    })
+    .returning();
+
+  return c.json(attachment, 201);
+});
+
+// ─── GET /medical-records/:id/attachments/:attachmentId/download ──────────────
+
+const downloadAttachmentRoute = createRoute({
+  method: "get",
+  path: "/medical-records/{id}/attachments/{attachmentId}/download",
+  tags: ["Medical Records"],
+  summary: "Download a file attachment (auth + ownership required)",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.string().uuid(),
+      attachmentId: z.string().uuid(),
+    }),
+  },
+  responses: {
+    200: { description: "File stream" },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Forbidden",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Record or attachment not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+medicalRecordsRoute.openapi(downloadAttachmentRoute, async (c) => {
+  const userId = c.get("userId");
+  const role = c.get("userRole");
+  const { id, attachmentId } = c.req.valid("param");
+
+  // Fetch record (same join as GET/:id)
+  const [row] = await db
+    .select({
+      id: medicalRecords.id,
+      patientId: medicalRecords.patientId,
+      doctorId: medicalRecords.doctorId,
+      appointmentId: medicalRecords.appointmentId,
+      diagnosis: medicalRecords.diagnosis,
+      symptoms: medicalRecords.symptoms,
+      notes: medicalRecords.notes,
+      createdAt: medicalRecords.createdAt,
+      appointmentDate: appointments.appointmentDate,
+      startTime: appointments.startTime,
+      appointmentType: appointments.type,
+      appointmentStatus: appointments.status,
+      doctorSpecialization: doctors.specialization,
+      doctorFirstName: users.firstName,
+      doctorLastName: users.lastName,
+    })
+    .from(medicalRecords)
+    .innerJoin(appointments, eq(appointments.id, medicalRecords.appointmentId))
+    .innerJoin(doctors, eq(doctors.id, medicalRecords.doctorId))
+    .innerJoin(users, eq(users.id, doctors.userId))
+    .where(eq(medicalRecords.id, id))
+    .limit(1);
+
+  if (!row) {
+    return c.json({ message: "Medical record not found" }, 404);
+  }
+
+  // Ownership check
+  if (role === "patient") {
+    const [patient] = await db
+      .select({ id: patients.id })
+      .from(patients)
+      .where(eq(patients.userId, userId))
+      .limit(1);
+
+    if (!patient || patient.id !== row.patientId) {
+      return c.json({ message: "Forbidden" }, 403);
+    }
+  } else if (role === "doctor") {
+    const [doctor] = await db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(eq(doctors.userId, userId))
+      .limit(1);
+
+    if (!doctor || doctor.id !== row.doctorId) {
+      return c.json({ message: "Forbidden" }, 403);
+    }
+  }
+  // admin: no ownership check
+
+  // Fetch attachment
+  const [attachment] = await db
+    .select()
+    .from(medicalRecordAttachments)
+    .where(
+      and(
+        eq(medicalRecordAttachments.id, attachmentId),
+        eq(medicalRecordAttachments.medicalRecordId, row.id)
+      )
+    )
+    .limit(1);
+
+  if (!attachment) {
+    return c.json({ message: "Attachment not found" }, 404);
+  }
+
+  // Stream file
+  const diskPath = path.join(process.cwd(), attachment.fileUrl);
+  const buffer = await readFile(diskPath);
+
+  return new Response(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type": attachment.fileType,
+      "Content-Disposition": `attachment; filename="${attachment.fileName}"`,
+    },
+  });
 });

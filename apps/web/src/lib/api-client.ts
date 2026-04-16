@@ -11,6 +11,7 @@ import type {
   Appointment,
   AppointmentType,
   MedicalRecord,
+  MedicalRecordAttachment,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -406,6 +407,18 @@ export const medicalRecordsApi = {
     const res = await apiClient.post<MedicalRecord>(
       "/api/v1/medical-records",
       data
+    );
+    return res.data;
+  },
+
+  uploadAttachment: async (
+    recordId: string,
+    formData: FormData
+  ): Promise<MedicalRecordAttachment> => {
+    const res = await apiClient.post<MedicalRecordAttachment>(
+      `/api/v1/medical-records/${recordId}/attachments`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
     );
     return res.data;
   },

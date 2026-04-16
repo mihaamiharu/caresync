@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { apiClient, authApi } from "./api-client";
+import { apiClient, authApi, medicalRecordsApi } from "./api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
 // Default handler: refresh always returns 401 (silences the interceptor's refresh attempt in the "throws on 401" test)
 const server = setupServer(
-  http.post("/api/v1/auth/refresh", () => HttpResponse.json({}, { status: 401 }))
+  http.post("/api/v1/auth/refresh", () =>
+    HttpResponse.json({}, { status: 401 })
+  )
 );
 
 beforeEach(() => server.listen({ onUnhandledRequest: "warn" }));
@@ -53,10 +55,13 @@ describe("authApi.register", () => {
   it("POSTs registration data and returns accessToken and user", async () => {
     server.use(
       http.post("/api/v1/auth/register", () =>
-        HttpResponse.json({
-          accessToken: "at-456",
-          user: { id: "u2", email: "new@test.com", role: "patient" },
-        }, { status: 201 })
+        HttpResponse.json(
+          {
+            accessToken: "at-456",
+            user: { id: "u2", email: "new@test.com", role: "patient" },
+          },
+          { status: 201 }
+        )
       )
     );
 
@@ -85,6 +90,46 @@ describe("authApi.logout", () => {
 
     await authApi.logout();
     expect(logoutCalled).toBe(true);
+  });
+});
+
+describe("medicalRecordsApi.uploadAttachment", () => {
+  const RECORD_ID = "rec-uuid-001";
+  const mockAttachment = {
+    id: "att-uuid-001",
+    medicalRecordId: RECORD_ID,
+    fileName: "lab-result.pdf",
+    fileUrl: "/uploads/medical-records/some-uuid.pdf",
+    fileType: "application/pdf",
+    fileSize: 12345,
+  };
+
+  it("POSTs FormData to the correct URL and returns the attachment", async () => {
+    let capturedUrl = "";
+    server.use(
+      http.post(
+        `/api/v1/medical-records/${RECORD_ID}/attachments`,
+        ({ request }) => {
+          capturedUrl = request.url;
+          return HttpResponse.json(mockAttachment, { status: 201 });
+        }
+      )
+    );
+
+    const form = new FormData();
+    form.append(
+      "file",
+      new File(["data"], "lab-result.pdf", { type: "application/pdf" })
+    );
+
+    const result = await medicalRecordsApi.uploadAttachment(RECORD_ID, form);
+
+    expect(capturedUrl).toContain(
+      `/api/v1/medical-records/${RECORD_ID}/attachments`
+    );
+    expect(result.id).toBe("att-uuid-001");
+    expect(result.fileName).toBe("lab-result.pdf");
+    expect(result.fileType).toBe("application/pdf");
   });
 });
 
