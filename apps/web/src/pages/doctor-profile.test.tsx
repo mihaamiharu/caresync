@@ -6,18 +6,27 @@ import { DoctorProfilePage } from "./doctor-profile";
 import { useAuthStore } from "@/stores/auth-store";
 import type { User, Doctor, DoctorSchedule } from "@caresync/shared";
 
+// Mock react-router to supply loader data without a data router
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return {
+    ...actual,
+    useLoaderData: vi.fn(),
+    useNavigation: vi.fn().mockReturnValue({ state: "idle" }),
+    useRevalidator: vi.fn().mockReturnValue({ revalidate: vi.fn() }),
+  };
+});
+
 vi.mock("@/lib/api-client", () => ({
-  doctorsApi: {
-    getDoctor: vi.fn(),
-  },
+  doctorsApi: {},
   schedulesApi: {
-    getSchedule: vi.fn(),
     putSchedule: vi.fn(),
     getAvailableSlots: vi.fn(),
   },
 }));
 
-import { doctorsApi, schedulesApi } from "@/lib/api-client";
+import { useLoaderData, useNavigation, useRevalidator } from "react-router";
+import { schedulesApi } from "@/lib/api-client";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -84,19 +93,22 @@ function renderPage() {
   );
 }
 
-function setDefaultMocks() {
-  vi.mocked(doctorsApi.getDoctor).mockResolvedValue(mockDoctor);
-  vi.mocked(schedulesApi.getSchedule).mockResolvedValue([]);
-  vi.mocked(schedulesApi.putSchedule).mockResolvedValue([]);
-  vi.mocked(schedulesApi.getAvailableSlots).mockResolvedValue([]);
-}
-
 // ─── Doctor profile page basics ───────────────────────────────────────────────
 
 describe("DoctorProfilePage — basics", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    setDefaultMocks();
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctor: mockDoctor,
+      schedule: [],
+    });
+    vi.mocked(schedulesApi.putSchedule).mockResolvedValue([]);
+    vi.mocked(schedulesApi.getAvailableSlots).mockResolvedValue([]);
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
     useAuthStore.setState({
       user: mockPatient,
       accessToken: "tok",
@@ -104,12 +116,10 @@ describe("DoctorProfilePage — basics", () => {
     });
   });
 
-  it("renders the profile page", async () => {
+  it("renders the profile page", () => {
     renderPage();
-    expect(
-      await screen.findByTestId("doctor-profile-page")
-    ).toBeInTheDocument();
-    expect(await screen.findByText("Dr. Jane Smith")).toBeInTheDocument();
+    expect(screen.getByTestId("doctor-profile-page")).toBeInTheDocument();
+    expect(screen.getByText("Dr. Jane Smith")).toBeInTheDocument();
   });
 });
 
@@ -118,28 +128,38 @@ describe("DoctorProfilePage — basics", () => {
 describe("DoctorScheduleForm — visibility", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    setDefaultMocks();
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctor: mockDoctor,
+      schedule: [],
+    });
+    vi.mocked(schedulesApi.putSchedule).mockResolvedValue([]);
+    vi.mocked(schedulesApi.getAvailableSlots).mockResolvedValue([]);
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
   });
 
-  it("hides the schedule form for a non-owning user (patient)", async () => {
+  it("hides the schedule form for a non-owning user (patient)", () => {
     useAuthStore.setState({
       user: mockPatient,
       accessToken: "tok",
       isLoading: false,
     });
     renderPage();
-    await screen.findByTestId("doctor-profile-page");
+    expect(screen.getByTestId("doctor-profile-page")).toBeInTheDocument();
     expect(screen.queryByTestId("schedule-form")).not.toBeInTheDocument();
   });
 
-  it("shows the schedule form for the owning doctor", async () => {
+  it("shows the schedule form for the owning doctor", () => {
     useAuthStore.setState({
       user: mockDoctorUser,
       accessToken: "tok",
       isLoading: false,
     });
     renderPage();
-    expect(await screen.findByTestId("schedule-form")).toBeInTheDocument();
+    expect(screen.getByTestId("schedule-form")).toBeInTheDocument();
   });
 });
 
@@ -148,7 +168,17 @@ describe("DoctorScheduleForm — visibility", () => {
 describe("DoctorScheduleForm — behaviour", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    setDefaultMocks();
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctor: mockDoctor,
+      schedule: [],
+    });
+    vi.mocked(schedulesApi.putSchedule).mockResolvedValue([]);
+    vi.mocked(schedulesApi.getAvailableSlots).mockResolvedValue([]);
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
     useAuthStore.setState({
       user: mockDoctorUser,
       accessToken: "tok",
@@ -156,22 +186,21 @@ describe("DoctorScheduleForm — behaviour", () => {
     });
   });
 
-  it("pre-populates the form with the existing schedule", async () => {
-    vi.mocked(schedulesApi.getSchedule).mockResolvedValue(mockSchedule);
+  it("pre-populates the form with the existing schedule from loader data", () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctor: mockDoctor,
+      schedule: mockSchedule,
+    });
     renderPage();
 
-    // Monday checkbox should become checked after load
-    const mondayCheckbox = await screen.findByTestId("day-toggle-monday");
-    await waitFor(() => expect(mondayCheckbox).toBeChecked());
-
-    // slot duration should be 30
+    expect(screen.getByTestId("schedule-form")).toBeInTheDocument();
+    expect(screen.getByTestId("day-toggle-monday")).toBeChecked();
     expect(screen.getByTestId("slot-duration-input")).toHaveValue(30);
   });
 
   it("shows success message after a successful save", async () => {
     vi.mocked(schedulesApi.putSchedule).mockResolvedValue([]);
     renderPage();
-    await screen.findByTestId("schedule-form");
 
     const submitBtn = screen.getByTestId("schedule-submit");
     await userEvent.click(submitBtn);
@@ -184,7 +213,6 @@ describe("DoctorScheduleForm — behaviour", () => {
       response: { data: { message: "Conflict with appointments" } },
     });
     renderPage();
-    await screen.findByTestId("schedule-form");
 
     const submitBtn = screen.getByTestId("schedule-submit");
     await userEvent.click(submitBtn);
@@ -194,16 +222,6 @@ describe("DoctorScheduleForm — behaviour", () => {
       "Conflict with appointments"
     );
   });
-
-  it("shows a load error when getSchedule fails", async () => {
-    vi.mocked(schedulesApi.getSchedule).mockRejectedValue(
-      new Error("Network error")
-    );
-    renderPage();
-    expect(
-      await screen.findByTestId("schedule-load-error")
-    ).toBeInTheDocument();
-  });
 });
 
 // ─── Slot viewer ──────────────────────────────────────────────────────────────
@@ -211,7 +229,17 @@ describe("DoctorScheduleForm — behaviour", () => {
 describe("DoctorAvailabilityViewer", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    setDefaultMocks();
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctor: mockDoctor,
+      schedule: [],
+    });
+    vi.mocked(schedulesApi.putSchedule).mockResolvedValue([]);
+    vi.mocked(schedulesApi.getAvailableSlots).mockResolvedValue([]);
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
     useAuthStore.setState({
       user: mockPatient,
       accessToken: "tok",
@@ -219,16 +247,14 @@ describe("DoctorAvailabilityViewer", () => {
     });
   });
 
-  it("renders the date picker", async () => {
+  it("renders the date picker", () => {
     renderPage();
-    await screen.findByTestId("doctor-profile-page");
     expect(screen.getByTestId("slot-date-picker")).toBeInTheDocument();
   });
 
   it("shows empty state when no slots are returned", async () => {
     vi.mocked(schedulesApi.getAvailableSlots).mockResolvedValue([]);
     renderPage();
-    await screen.findByTestId("doctor-profile-page");
 
     const datePicker = screen.getByTestId("slot-date-picker");
     fireEvent.change(datePicker, { target: { value: "2026-05-05" } });
@@ -241,7 +267,6 @@ describe("DoctorAvailabilityViewer", () => {
       new Error("500")
     );
     renderPage();
-    await screen.findByTestId("doctor-profile-page");
 
     const datePicker = screen.getByTestId("slot-date-picker");
     fireEvent.change(datePicker, { target: { value: "2026-05-05" } });
@@ -257,7 +282,6 @@ describe("DoctorAvailabilityViewer", () => {
       "2026-05-04T02:30:00.000Z",
     ]);
     renderPage();
-    await screen.findByTestId("doctor-profile-page");
 
     const datePicker = screen.getByTestId("slot-date-picker");
     fireEvent.change(datePicker, { target: { value: "2026-05-04" } });

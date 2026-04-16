@@ -6,13 +6,23 @@ import { ProfilePage } from "./profile";
 import { useAuthStore } from "@/stores/auth-store";
 import type { User, Patient } from "@caresync/shared";
 
+// Mock react-router to supply loader data without a data router
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return {
+    ...actual,
+    useLoaderData: vi.fn(),
+    useNavigation: vi.fn().mockReturnValue({ state: "idle" }),
+    useRevalidator: vi.fn().mockReturnValue({ revalidate: vi.fn() }),
+  };
+});
+
 vi.mock("@/lib/api-client", () => ({
   usersApi: {
     updateProfile: vi.fn(),
     updateAvatar: vi.fn(),
   },
   patientsApi: {
-    getPatient: vi.fn(),
     upsertPatient: vi.fn(),
   },
   authApi: {
@@ -20,6 +30,7 @@ vi.mock("@/lib/api-client", () => ({
   },
 }));
 
+import { useLoaderData } from "react-router";
 import { usersApi, patientsApi } from "@/lib/api-client";
 
 const mockUser: User = {
@@ -33,6 +44,17 @@ const mockUser: User = {
   isActive: true,
   createdAt: "2024-01-01T00:00:00.000Z",
   updatedAt: "2024-01-01T00:00:00.000Z",
+};
+
+const mockPatient: Patient = {
+  id: "patient-uuid-123",
+  userId: "user-uuid-123",
+  dateOfBirth: "1990-05-15",
+  gender: "male",
+  bloodType: "A+",
+  allergies: "penicillin",
+  emergencyContactName: "Jane Doe",
+  emergencyContactPhone: "+1234567890",
 };
 
 function renderProfile() {
@@ -54,7 +76,9 @@ describe("ProfilePage", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: null });
+    vi.mocked(usersApi.updateProfile).mockResolvedValue(mockUser);
+    vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
   });
 
   it("renders the page with a heading", () => {
@@ -139,8 +163,6 @@ describe("ProfilePage", () => {
   });
 
   it("disables the save button while submitting", async () => {
-    // Use a never-settling promise so isSubmitting stays true without
-    // leaving a real timer that fires setAuth(undefined) mid-test in CI.
     vi.mocked(usersApi.updateProfile).mockImplementation(
       () => new Promise(() => {})
     );
@@ -169,17 +191,6 @@ describe("ProfilePage", () => {
   });
 });
 
-const mockPatient: Patient = {
-  id: "patient-uuid-123",
-  userId: "user-uuid-123",
-  dateOfBirth: "1990-05-15",
-  gender: "male",
-  bloodType: "A+",
-  allergies: "penicillin",
-  emergencyContactName: "Jane Doe",
-  emergencyContactPhone: "+1234567890",
-};
-
 describe("ProfilePage — Medical Information section (patient role)", () => {
   beforeEach(() => {
     useAuthStore.setState({
@@ -188,27 +199,21 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    // Seed baseline mocks so the full ProfilePage tree is safe after resetAllMocks.
-    // Without these, an accidental profile-form submission would call
-    // updateProfile() → undefined → setAuth(undefined, token) → user cleared →
-    // MedicalInfoForm unmounts before setSuccess(true) fires.
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: null });
     vi.mocked(usersApi.updateProfile).mockResolvedValue(mockUser);
+    vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
   });
 
-  it("renders the Medical Information section for patients", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
+  it("renders the Medical Information section for patients", () => {
     renderProfile();
-    expect(
-      await screen.findByTestId("medical-info-section")
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("medical-info-section")).toBeInTheDocument();
   });
 
-  it("pre-fills medical fields from existing patient data", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(mockPatient);
+  it("pre-fills medical fields from existing patient data in loader", () => {
+    vi.mocked(useLoaderData).mockReturnValue({ patient: mockPatient });
     renderProfile();
 
-    expect(await screen.findByTestId("dob-input")).toHaveValue("1990-05-15");
+    expect(screen.getByTestId("dob-input")).toHaveValue("1990-05-15");
     expect(screen.getByTestId("gender-select")).toHaveValue("male");
     expect(screen.getByTestId("blood-type-select")).toHaveValue("A+");
     expect(screen.getByTestId("allergies-input")).toHaveValue("penicillin");
@@ -220,21 +225,20 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
     );
   });
 
-  it("shows empty fields when no patient row exists", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
+  it("shows empty fields when no patient row exists", () => {
+    // useLoaderData returns { patient: null } from beforeEach
     renderProfile();
 
-    expect(await screen.findByTestId("dob-input")).toHaveValue("");
+    expect(screen.getByTestId("dob-input")).toHaveValue("");
     expect(screen.getByTestId("gender-select")).toHaveValue("");
     expect(screen.getByTestId("blood-type-select")).toHaveValue("");
   });
 
   it("calls patientsApi.upsertPatient on submit", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(mockPatient);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: mockPatient });
     vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
     renderProfile();
 
-    await screen.findByTestId("medical-info-section");
     await userEvent.click(screen.getByTestId("save-medical-button"));
 
     await waitFor(() => {
@@ -243,18 +247,16 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
   });
 
   it("shows success message after saving medical info", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(mockPatient);
+    vi.mocked(useLoaderData).mockReturnValue({ patient: mockPatient });
     vi.mocked(patientsApi.upsertPatient).mockResolvedValue(mockPatient);
     renderProfile();
 
-    await screen.findByTestId("medical-info-section");
     await userEvent.click(screen.getByTestId("save-medical-button"));
 
     expect(await screen.findByTestId("medical-success")).toBeInTheDocument();
   });
 
   it("shows error message when medical save fails", async () => {
-    vi.mocked(patientsApi.getPatient).mockResolvedValue(null);
     vi.mocked(patientsApi.upsertPatient).mockRejectedValue(
       Object.assign(new Error("fail"), {
         response: { data: { message: "Validation error" } },
@@ -262,7 +264,6 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
     );
     renderProfile();
 
-    await screen.findByTestId("medical-info-section");
     await userEvent.click(screen.getByTestId("save-medical-button"));
 
     expect(await screen.findByTestId("medical-error")).toBeInTheDocument();

@@ -10,6 +10,7 @@ import type {
   Patient,
   Appointment,
   AppointmentType,
+  MedicalRecord,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -368,6 +369,43 @@ export const schedulesApi = {
     const res = await apiClient.get<string[]>(
       `/api/v1/doctors/${doctorId}/available-slots`,
       { params: { date } }
+    );
+    return res.data;
+  },
+};
+
+export interface CreateMedicalRecordInput {
+  appointmentId: string;
+  diagnosis: string;
+  symptoms?: string | null;
+  notes?: string | null;
+}
+
+export interface ListMedicalRecordsParams {
+  patientId?: string;
+  appointmentId?: string;
+}
+
+export const medicalRecordsApi = {
+  list: async (params?: ListMedicalRecordsParams): Promise<MedicalRecord[]> => {
+    const res = await apiClient.get<MedicalRecord[]>(
+      "/api/v1/medical-records",
+      { params }
+    );
+    return res.data;
+  },
+
+  get: async (id: string): Promise<MedicalRecord> => {
+    const res = await apiClient.get<MedicalRecord>(
+      `/api/v1/medical-records/${id}`
+    );
+    return res.data;
+  },
+
+  create: async (data: CreateMedicalRecordInput): Promise<MedicalRecord> => {
+    const res = await apiClient.post<MedicalRecord>(
+      "/api/v1/medical-records",
+      data
     );
     return res.data;
   },

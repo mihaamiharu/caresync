@@ -1,64 +1,57 @@
-import { useState, useEffect, useCallback } from "react";
+import { useLoaderData, useNavigation, useSearchParams } from "react-router";
 import { patientsApi } from "@/lib/api-client";
 import { BLOOD_TYPES, GENDERS } from "@caresync/shared";
 import type { Patient } from "@caresync/shared";
 
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+export async function patientsLoader({ request }: { request: Request }) {
+  const url = new URL(request.url);
+  const page = Number(url.searchParams.get("page") ?? "1");
+  const search = url.searchParams.get("search") ?? "";
+  const gender = url.searchParams.get("gender") ?? "";
+  const bloodType = url.searchParams.get("bloodType") ?? "";
+  return patientsApi.listPatients({
+    page,
+    limit: 20,
+    search: search || undefined,
+    gender: gender || undefined,
+    bloodType: bloodType || undefined,
+  });
+}
+
 export function PatientsPage() {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState("");
-  const [gender, setGender] = useState("");
-  const [bloodType, setBloodType] = useState("");
-  const [loading, setLoading] = useState(true);
+  const {
+    data: patients,
+    total,
+    page,
+    totalPages,
+  } = useLoaderData() as {
+    data: Patient[];
+    total: number;
+    page: number;
+    totalPages: number;
+  };
+  const navigation = useNavigation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const search = searchParams.get("search") ?? "";
+  const gender = searchParams.get("gender") ?? "";
+  const bloodType = searchParams.get("bloodType") ?? "";
 
   const LIMIT = 20;
+  const isLoading = navigation.state !== "idle";
 
-  const fetchPatients = useCallback(
-    async (params: {
-      page: number;
-      search: string;
-      gender: string;
-      bloodType: string;
-    }) => {
-      setLoading(true);
-      try {
-        const res = await patientsApi.listPatients({
-          page: params.page,
-          limit: LIMIT,
-          search: params.search || undefined,
-          gender: params.gender || undefined,
-          bloodType: params.bloodType || undefined,
-        });
-        setPatients(res.data);
-        setTotal(res.total);
-        setTotalPages(res.totalPages);
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  useEffect(() => {
-    fetchPatients({ page, search, gender, bloodType });
-  }, [fetchPatients, page, search, gender, bloodType]);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-    setPage(1);
-  };
-
-  const handleGenderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setGender(e.target.value);
-    setPage(1);
-  };
-
-  const handleBloodTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setBloodType(e.target.value);
-    setPage(1);
-  };
+  function setParam(key: string, value: string) {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set(key, value);
+    } else {
+      next.delete(key);
+    }
+    if (key !== "page") next.set("page", "1");
+    setSearchParams(next);
+  }
 
   return (
     <div data-testid="patients-page">
@@ -76,14 +69,14 @@ export function PatientsPage() {
           data-testid="search-input"
           placeholder="Search by name or email…"
           value={search}
-          onChange={handleSearchChange}
+          onChange={(e) => setParam("search", e.target.value)}
           className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring w-64"
         />
 
         <select
           data-testid="gender-filter"
           value={gender}
-          onChange={handleGenderChange}
+          onChange={(e) => setParam("gender", e.target.value)}
           className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">All genders</option>
@@ -97,7 +90,7 @@ export function PatientsPage() {
         <select
           data-testid="blood-type-filter"
           value={bloodType}
-          onChange={handleBloodTypeChange}
+          onChange={(e) => setParam("bloodType", e.target.value)}
           className="rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">All blood types</option>
@@ -132,7 +125,7 @@ export function PatientsPage() {
             </tr>
           </thead>
           <tbody>
-            {!loading && patients.length === 0 && (
+            {!isLoading && patients.length === 0 && (
               <tr>
                 <td
                   colSpan={5}
@@ -143,29 +136,30 @@ export function PatientsPage() {
                 </td>
               </tr>
             )}
-            {patients.map((patient) => (
-              <tr
-                key={patient.id}
-                data-testid={`patient-row-${patient.id}`}
-                className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-              >
-                <td className="px-4 py-3 font-medium text-foreground">
-                  {patient.user?.firstName} {patient.user?.lastName}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {patient.user?.email}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {patient.dateOfBirth ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {patient.gender ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {patient.bloodType ?? "—"}
-                </td>
-              </tr>
-            ))}
+            {!isLoading &&
+              patients.map((patient) => (
+                <tr
+                  key={patient.id}
+                  data-testid={`patient-row-${patient.id}`}
+                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                >
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    {patient.user?.firstName} {patient.user?.lastName}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {patient.user?.email}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {patient.dateOfBirth ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {patient.gender ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {patient.bloodType ?? "—"}
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
@@ -182,7 +176,7 @@ export function PatientsPage() {
         </span>
         <div className="flex gap-2">
           <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setParam("page", String(Math.max(1, page - 1)))}
             disabled={page <= 1}
             className="rounded-md border border-input px-3 py-1 disabled:opacity-40 hover:bg-accent"
           >
@@ -192,7 +186,9 @@ export function PatientsPage() {
             {page} / {totalPages || 1}
           </span>
           <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() =>
+              setParam("page", String(Math.min(totalPages, page + 1)))
+            }
             disabled={page >= totalPages}
             className="rounded-md border border-input px-3 py-1 disabled:opacity-40 hover:bg-accent"
           >

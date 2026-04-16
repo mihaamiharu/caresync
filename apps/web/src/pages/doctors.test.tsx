@@ -6,6 +6,17 @@ import { DoctorsPage } from "./doctors";
 import { useAuthStore } from "@/stores/auth-store";
 import type { User, Doctor, Department } from "@caresync/shared";
 
+// Mock react-router to supply loader data without a data router
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return {
+    ...actual,
+    useLoaderData: vi.fn(),
+    useNavigation: vi.fn().mockReturnValue({ state: "idle" }),
+    useRevalidator: vi.fn().mockReturnValue({ revalidate: vi.fn() }),
+  };
+});
+
 vi.mock("@/lib/api-client", () => ({
   doctorsApi: {
     listDoctors: vi.fn(),
@@ -14,14 +25,15 @@ vi.mock("@/lib/api-client", () => ({
     deleteDoctor: vi.fn(),
   },
   departmentsApi: {
-    listDepartments: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    listDepartments: vi.fn(),
   },
   authApi: {
     login: vi.fn(),
   },
 }));
 
-import { doctorsApi, departmentsApi } from "@/lib/api-client";
+import { useLoaderData, useNavigation, useRevalidator } from "react-router";
+import { doctorsApi } from "@/lib/api-client";
 
 const mockPatient: User = {
   id: "user-patient-1",
@@ -77,14 +89,6 @@ const mockDoctors: Doctor[] = [
   },
 ];
 
-const paginatedResponse = {
-  data: mockDoctors,
-  total: 1,
-  page: 1,
-  limit: 20,
-  totalPages: 1,
-};
-
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/doctors"]}>
@@ -103,39 +107,70 @@ describe("DoctorsPage — read-only view (patient)", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(doctorsApi.listDoctors).mockResolvedValue(paginatedResponse);
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctors: mockDoctors,
+      departments: mockDepts,
+    });
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
   });
 
-  it("renders the page heading", async () => {
+  it("renders the page heading", () => {
     renderPage();
-    expect(await screen.findByTestId("doctors-page")).toBeInTheDocument();
+    expect(screen.getByTestId("doctors-page")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: /doctors/i, level: 1 })
     ).toBeInTheDocument();
   });
 
-  it("shows doctor cards after loading", async () => {
+  it("shows doctor cards from loader data", () => {
     renderPage();
     expect(
-      await screen.findByTestId(
-        "doctor-card-00000000-0000-0000-0000-000000000001"
-      )
+      screen.getByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
     ).toBeInTheDocument();
     expect(screen.getByText("Dr. James Smith")).toBeInTheDocument();
-    // Use getAllByText because Cardiology appears as specialization AND department
+    // Cardiology appears as specialization AND department
     expect(screen.getAllByText("Cardiology").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("does NOT show the Create Doctor button for non-admin", async () => {
+  it("does NOT show the Create Doctor button for non-admin", () => {
     renderPage();
-    await screen.findByTestId("doctors-page");
     expect(
       screen.queryByTestId("create-doctor-button")
     ).not.toBeInTheDocument();
   });
+
+  it("shows a loading indicator while the router is navigating", () => {
+    vi.mocked(useNavigation).mockReturnValue({ state: "loading" } as any);
+    renderPage();
+    expect(screen.getByTestId("doctors-loading")).toBeInTheDocument();
+  });
+
+  it("filters doctors client-side when user types in search", async () => {
+    renderPage();
+    const searchInput = screen.getByTestId("doctors-search");
+    await userEvent.type(searchInput, "james");
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
+      ).toBeInTheDocument();
+    });
+    await userEvent.clear(searchInput);
+    await userEvent.type(searchInput, "zzznomatch");
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("doctor-card-00000000-0000-0000-0000-000000000001")
+      ).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("DoctorsPage — admin view", () => {
+  let revalidateMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     useAuthStore.setState({
       user: mockAdmin,
@@ -143,34 +178,34 @@ describe("DoctorsPage — admin view", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(doctorsApi.listDoctors).mockResolvedValue(paginatedResponse);
-    vi.mocked(departmentsApi.listDepartments).mockResolvedValue({
-      data: mockDepts,
-      total: 1,
-      page: 1,
-      limit: 100,
-      totalPages: 1,
+    vi.mocked(useLoaderData).mockReturnValue({
+      doctors: mockDoctors,
+      departments: mockDepts,
+    });
+    revalidateMock = vi.fn();
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: revalidateMock as any,
+      state: "idle",
     });
   });
 
-  it("shows the Create Doctor button for admin", async () => {
+  it("shows the Create Doctor button for admin", () => {
     renderPage();
-    expect(
-      await screen.findByTestId("create-doctor-button")
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("create-doctor-button")).toBeInTheDocument();
   });
 
   it("opens the create form when Create Doctor is clicked", async () => {
     renderPage();
-    await userEvent.click(await screen.findByTestId("create-doctor-button"));
+    await userEvent.click(screen.getByTestId("create-doctor-button"));
     expect(screen.getByTestId("doctor-form-modal")).toBeInTheDocument();
   });
 
-  it("calls createDoctor on form submit and refreshes the list", async () => {
+  it("calls createDoctor on form submit and revalidates", async () => {
     vi.mocked(doctorsApi.createDoctor).mockResolvedValue(mockDoctors[0]);
 
     renderPage();
-    await userEvent.click(await screen.findByTestId("create-doctor-button"));
+    await userEvent.click(screen.getByTestId("create-doctor-button"));
 
     await userEvent.type(screen.getByTestId("doctor-firstName-input"), "James");
     await userEvent.type(screen.getByTestId("doctor-lastName-input"), "Smith");
@@ -183,12 +218,10 @@ describe("DoctorsPage — admin view", () => {
       "password123"
     );
 
-    // Wait for departments to load
-    await waitFor(() => {
-      expect(
-        screen.getByRole("option", { name: "Cardiology" })
-      ).toBeInTheDocument();
-    });
+    // Departments are available synchronously from loader data
+    expect(
+      screen.getByRole("option", { name: "Cardiology" })
+    ).toBeInTheDocument();
 
     await userEvent.selectOptions(
       screen.getByTestId("doctor-department-input"),
@@ -211,17 +244,11 @@ describe("DoctorsPage — admin view", () => {
         })
       );
     });
-    // List should be re-fetched
-    await waitFor(() => {
-      expect(doctorsApi.listDoctors).toHaveBeenCalledTimes(2);
-    });
+    await waitFor(() => expect(revalidateMock).toHaveBeenCalled());
   });
 
-  it("shows edit and delete buttons on each doctor card for admin", async () => {
+  it("shows edit and delete buttons on each doctor card for admin", () => {
     renderPage();
-    await screen.findByTestId(
-      "doctor-card-00000000-0000-0000-0000-000000000001"
-    );
     expect(
       screen.getByTestId("edit-doctor-00000000-0000-0000-0000-000000000001")
     ).toBeInTheDocument();

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useLoaderData, useNavigation, useRevalidator } from "react-router";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +7,19 @@ import { z } from "zod";
 import { doctorsApi, departmentsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Doctor, Department } from "@caresync/shared";
+
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+export async function doctorsLoader() {
+  const [doctorsRes, deptsRes] = await Promise.all([
+    doctorsApi.listDoctors(),
+    departmentsApi.listDepartments({ limit: 100 }),
+  ]);
+  return {
+    doctors: doctorsRes.data,
+    departments: deptsRes.data.filter((d) => d.isActive),
+  };
+}
 
 // ─── Form schema ───────────────────────────────────────────────────────────────
 
@@ -31,14 +45,19 @@ type DoctorFormInput = z.infer<typeof doctorFormSchema>;
 
 interface DoctorFormModalProps {
   doctor?: Doctor | null;
+  departments: Department[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-function DoctorFormModal({ doctor, onClose, onSaved }: DoctorFormModalProps) {
+function DoctorFormModal({
+  doctor,
+  departments,
+  onClose,
+  onSaved,
+}: DoctorFormModalProps) {
   const isEditing = !!doctor;
   const [serverError, setServerError] = useState<string | null>(null);
-  const [departments, setDepartments] = useState<Department[]>([]);
 
   const {
     register,
@@ -58,12 +77,6 @@ function DoctorFormModal({ doctor, onClose, onSaved }: DoctorFormModalProps) {
       licenseNumber: doctor?.licenseNumber ?? "",
     },
   });
-
-  useEffect(() => {
-    departmentsApi.listDepartments({ limit: 100 }).then((res) => {
-      setDepartments(res.data.filter((d) => d.isActive));
-    });
-  }, []);
 
   const onSubmit = async (data: DoctorFormInput) => {
     setServerError(null);
@@ -126,14 +139,16 @@ function DoctorFormModal({ doctor, onClose, onSaved }: DoctorFormModalProps) {
       } else if (data?.errors) {
         // Flatten other potential error structures
         const errorMsgs = Object.entries(data.errors)
-          .map(([field, error]: [string, any]) => `${field}: ${error._errors?.join(", ") || error}`)
+          .map(
+            ([field, error]: [string, any]) =>
+              `${field}: ${error._errors?.join(", ") || error}`
+          )
           .join(" | ");
         setServerError(errorMsgs || "Validation failed");
       } else {
         setServerError("Something went wrong. Please try again.");
       }
     }
-
   };
 
   return (
@@ -438,32 +453,29 @@ function DoctorCard({ doctor, isAdmin, onEdit, onDelete }: DoctorCardProps) {
 // ─── DoctorsPage ───────────────────────────────────────────────────────────────
 
 export function DoctorsPage() {
+  const { doctors: initialDoctors, departments } = useLoaderData() as {
+    doctors: Doctor[];
+    departments: Department[];
+  };
+  const navigation = useNavigation();
+  const revalidator = useRevalidator();
+
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "admin";
 
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
 
-  const fetchDoctors = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await doctorsApi.listDoctors({ search: search || undefined });
-      setDoctors(res.data);
-    } catch {
-      setError("Failed to load doctors. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
+  const isLoading = navigation.state !== "idle";
 
-  useEffect(() => {
-    fetchDoctors();
-  }, [fetchDoctors]);
+  const filtered = initialDoctors.filter((d) => {
+    const name =
+      `${d.user?.firstName ?? ""} ${d.user?.lastName ?? ""}`.toLowerCase();
+    const spec = d.specialization.toLowerCase();
+    const q = search.toLowerCase();
+    return name.includes(q) || spec.includes(q);
+  });
 
   const handleDelete = async (id: string) => {
     if (
@@ -475,7 +487,7 @@ export function DoctorsPage() {
     }
     try {
       await doctorsApi.deleteDoctor(id);
-      fetchDoctors();
+      revalidator.revalidate();
     } catch {
       alert("Failed to delete doctor.");
     }
@@ -529,7 +541,7 @@ export function DoctorsPage() {
       </div>
 
       {/* States */}
-      {loading && (
+      {isLoading && (
         <div
           data-testid="doctors-loading"
           className="py-12 text-center text-muted-foreground"
@@ -538,16 +550,7 @@ export function DoctorsPage() {
         </div>
       )}
 
-      {error && !loading && (
-        <div
-          data-testid="doctors-error"
-          className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive"
-        >
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && doctors.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div
           data-testid="doctors-empty"
           className="py-12 text-center text-muted-foreground"
@@ -557,9 +560,9 @@ export function DoctorsPage() {
       )}
 
       {/* Doctor cards */}
-      {!loading && !error && doctors.length > 0 && (
+      {!isLoading && filtered.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {doctors.map((doctor) => (
+          {filtered.map((doctor) => (
             <DoctorCard
               key={doctor.id}
               doctor={doctor}
@@ -575,8 +578,9 @@ export function DoctorsPage() {
       {modalOpen && (
         <DoctorFormModal
           doctor={editingDoctor}
+          departments={departments}
           onClose={handleModalClose}
-          onSaved={fetchDoctors}
+          onSaved={revalidator.revalidate}
         />
       )}
     </div>

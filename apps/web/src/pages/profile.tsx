@@ -1,10 +1,19 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
+import { useLoaderData } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { usersApi, patientsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { BLOOD_TYPES, GENDERS } from "@caresync/shared";
+import type { Patient } from "@caresync/shared";
+
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+export async function profileLoader() {
+  const patient = await patientsApi.getPatient().catch(() => null);
+  return { patient };
+}
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -27,31 +36,25 @@ const medicalSchema = z.object({
 
 type MedicalInput = z.infer<typeof medicalSchema>;
 
-function MedicalInfoForm() {
+function MedicalInfoForm({ patient }: { patient: Patient | null }) {
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    reset,
     formState: { isSubmitting },
-  } = useForm<MedicalInput>({ resolver: zodResolver(medicalSchema) });
-
-  useEffect(() => {
-    patientsApi.getPatient().then((patient) => {
-      if (patient) {
-        reset({
-          dateOfBirth: patient.dateOfBirth ?? "",
-          gender: patient.gender ?? "",
-          bloodType: patient.bloodType ?? "",
-          allergies: patient.allergies ?? "",
-          emergencyContactName: patient.emergencyContactName ?? "",
-          emergencyContactPhone: patient.emergencyContactPhone ?? "",
-        });
-      }
-    });
-  }, [reset]);
+  } = useForm<MedicalInput>({
+    resolver: zodResolver(medicalSchema),
+    defaultValues: {
+      dateOfBirth: patient?.dateOfBirth ?? "",
+      gender: patient?.gender ?? "",
+      bloodType: patient?.bloodType ?? "",
+      allergies: patient?.allergies ?? "",
+      emergencyContactName: patient?.emergencyContactName ?? "",
+      emergencyContactPhone: patient?.emergencyContactPhone ?? "",
+    },
+  });
 
   const onSubmit = async (data: MedicalInput) => {
     setSuccess(false);
@@ -216,6 +219,7 @@ function MedicalInfoForm() {
 }
 
 export function ProfilePage() {
+  const { patient } = useLoaderData() as { patient: Patient | null };
   const user = useAuthStore((s) => s.user);
   const setAuth = useAuthStore((s) => s.setAuth);
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -445,7 +449,7 @@ export function ProfilePage() {
         </div>
 
         {/* Medical Information — patient role only */}
-        {user?.role === "patient" && <MedicalInfoForm />}
+        {user?.role === "patient" && <MedicalInfoForm patient={patient} />}
       </div>
     </div>
   );
