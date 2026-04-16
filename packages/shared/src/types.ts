@@ -103,6 +103,7 @@ export interface MedicalRecord {
   createdAt: string;
   appointment?: MedicalRecordAppointmentSummary;
   doctor?: MedicalRecordDoctorSummary;
+  attachments?: MedicalRecordAttachment[];
 }
 
 export interface MedicalRecordAttachment {
