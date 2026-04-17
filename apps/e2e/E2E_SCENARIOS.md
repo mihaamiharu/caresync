@@ -1,7 +1,7 @@
 # CareSync — E2E Test Scenarios
 
 Test suite: Playwright (`apps/e2e`)
-Base URL: `http://localhost:5173` (web) + `http://localhost:3000` (api)
+Base URL: `http://localhost:5173` (web) + `http://localhost:3001` (api)
 
 ---
 

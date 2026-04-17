@@ -18,7 +18,7 @@ COPY apps/api ./apps/api
 # Create upload directories
 RUN mkdir -p apps/api/uploads/medical-records apps/api/uploads/avatars
 
-EXPOSE 3000
+EXPOSE 3001
 
 WORKDIR /app/apps/api
 
