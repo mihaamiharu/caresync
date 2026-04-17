@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -62,9 +62,9 @@ const baseInvoice = {
   id: "00000000-0000-0000-0000-000000000001",
   appointmentId: "00000000-0000-0000-0000-000000000101",
   patientId: "00000000-0000-0000-0000-000000000201",
-  amount: "100.00",
-  tax: "10.00",
-  total: "110.00",
+  amount: 100.0,
+  tax: 10.0,
+  total: 110.0,
   status: "pending" as InvoiceStatus,
   dueDate: "2026-04-20",
   paidAt: null,
@@ -116,7 +116,7 @@ describe("InvoiceListPage — patient view", () => {
     });
     vi.resetAllMocks();
     vi.mocked(useLoaderData).mockReturnValue({ invoices: mockInvoices });
-    vi.mocked(useNavigation).mockReturnValue({ state: "idle" });
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
       revalidate: vi.fn(),
       state: "idle",
@@ -193,7 +193,7 @@ describe("InvoiceListPage — patient view", () => {
   });
 
   it("shows loading indicator when navigating", () => {
-    vi.mocked(useNavigation).mockReturnValue({ state: "loading" });
+    vi.mocked(useNavigation).mockReturnValue({ state: "loading" } as any);
     renderListPage();
     expect(screen.getByTestId("invoices-loading")).toBeInTheDocument();
   });
@@ -208,7 +208,7 @@ describe("InvoiceListPage — admin view", () => {
     });
     vi.resetAllMocks();
     vi.mocked(useLoaderData).mockReturnValue({ invoices: mockInvoices });
-    vi.mocked(useNavigation).mockReturnValue({ state: "idle" });
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
       revalidate: vi.fn(),
       state: "idle",
@@ -234,7 +234,7 @@ describe("InvoiceDetailPage — with 3-minute countdown and payment simulation",
       isLoading: false,
     });
     vi.resetAllMocks();
-    vi.mocked(useNavigation).mockReturnValue({ state: "idle" });
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
     vi.mocked(useRevalidator).mockReturnValue({
       revalidate: vi.fn(),
       state: "idle",

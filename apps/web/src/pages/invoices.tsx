@@ -4,6 +4,7 @@ import {
   useNavigation,
   useParams,
   useRevalidator,
+  LoaderFunctionArgs,
 } from "react-router";
 import { invoicesApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -16,12 +17,8 @@ export async function invoicesLoader() {
   return { invoices: res.data };
 }
 
-export async function invoiceDetailLoader({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const invoice = await invoicesApi.getInvoice(params.id);
+export async function invoiceDetailLoader({ params }: LoaderFunctionArgs) {
+  const invoice = await invoicesApi.getInvoice(params.id!);
   return {
     invoice,
     expiresAt: invoice.status === "pending" ? Date.now() + 180_000 : null,

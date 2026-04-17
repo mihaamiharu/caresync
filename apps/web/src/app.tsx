@@ -1,4 +1,8 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import {
+  createBrowserRouter,
+  Navigate,
+  LoaderFunctionArgs,
+} from "react-router";
 import { AppLayout } from "@/layouts/app-layout";
 import { DashboardPage } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
