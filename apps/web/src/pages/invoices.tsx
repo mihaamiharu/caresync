@@ -1,5 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
-import { useLoaderData, useNavigation, useParams, useRevalidator } from "react-router";
+import { useState, useCallback, useSyncExternalStore } from "react";
+import {
+  useLoaderData,
+  useNavigation,
+  useParams,
+  useRevalidator,
+} from "react-router";
 import { invoicesApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Invoice, InvoiceStatus } from "@caresync/shared";
@@ -11,9 +16,29 @@ export async function invoicesLoader() {
   return { invoices: res.data };
 }
 
-export async function invoiceDetailLoader({ params }: { params: { id: string } }) {
+export async function invoiceDetailLoader({
+  params,
+}: {
+  params: { id: string };
+}) {
   const invoice = await invoicesApi.getInvoice(params.id);
-  return { invoice };
+  return {
+    invoice,
+    expiresAt: invoice.status === "pending" ? Date.now() + 180_000 : null,
+  };
+}
+
+// ─── Tick store (no useEffect) ─────────────────────────────────────────────────
+
+const tick = () => Date.now();
+const subscribe = () => {
+  const id = setInterval(tick, 1000);
+  return () => clearInterval(id);
+};
+const getSnapshot = () => 0;
+
+function useNow() {
+  return useSyncExternalStore(subscribe, tick, getSnapshot);
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -31,7 +56,13 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function StatusBadge({ status, invoiceId }: { status: InvoiceStatus; invoiceId?: string }) {
+function StatusBadge({
+  status,
+  invoiceId,
+}: {
+  status: InvoiceStatus;
+  invoiceId?: string;
+}) {
   const classes: Record<InvoiceStatus, string> = {
     pending: "bg-yellow-100 text-yellow-800",
     paid: "bg-green-100 text-green-800",
@@ -75,8 +106,7 @@ interface InvoiceCardProps {
 
 function InvoiceCard({ invoice, showPayButton, onPay }: InvoiceCardProps) {
   const isOverdue =
-    invoice.status === "pending" &&
-    new Date(invoice.dueDate) < new Date();
+    invoice.status === "pending" && new Date(invoice.dueDate) < new Date();
 
   return (
     <div
@@ -95,12 +125,10 @@ function InvoiceCard({ invoice, showPayButton, onPay }: InvoiceCardProps) {
             Due: {formatDate(invoice.dueDate)}
           </p>
           {isOverdue && invoice.status !== "overdue" && (
-            <p className="mt-1 text-xs font-medium text-destructive">
-              Overdue
-            </p>
+            <p className="mt-1 text-xs font-medium text-destructive">Overdue</p>
           )}
         </div>
-          <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2">
           <StatusBadge status={invoice.status} invoiceId={invoice.id} />
           {showPayButton && invoice.status === "pending" && (
             <a
@@ -141,7 +169,10 @@ export function InvoiceListPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       {isLoading && (
-        <div data-testid="invoices-loading" className="flex justify-center py-8">
+        <div
+          data-testid="invoices-loading"
+          className="flex justify-center py-8"
+        >
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       )}
@@ -176,7 +207,9 @@ export function InvoiceListPage() {
                 <InvoiceCard
                   key={invoice.id}
                   invoice={invoice}
-                  showPayButton={user?.role === "patient" || user?.role === "admin"}
+                  showPayButton={
+                    user?.role === "patient" || user?.role === "admin"
+                  }
                 />
               ))}
             </div>
@@ -188,20 +221,11 @@ export function InvoiceListPage() {
 }
 
 // ─── Payment Countdown ─────────────────────────────────────────────────────────
+// Uses useSyncExternalStore (no useEffect) to tick every second.
 
-function PaymentCountdown({ onExpire }: { onExpire: () => void }) {
-  const [secondsLeft, setSecondsLeft] = useState(180); // 3 minutes
-
-  useEffect(() => {
-    if (secondsLeft <= 0) {
-      onExpire();
-      return;
-    }
-    const timer = setInterval(() => {
-      setSecondsLeft((s) => s - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [secondsLeft, onExpire]);
+function PaymentCountdown({ expiresAt }: { expiresAt: number }) {
+  const now = useNow();
+  const secondsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
@@ -209,13 +233,26 @@ function PaymentCountdown({ onExpire }: { onExpire: () => void }) {
 
   const isUrgent = secondsLeft <= 30;
 
+  if (secondsLeft === 0) {
+    return (
+      <div
+        data-testid="payment-countdown"
+        className="rounded-lg bg-destructive/10 p-4 text-center"
+      >
+        <p className="text-sm text-destructive">Payment window expired.</p>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="payment-countdown"
       className={`rounded-lg p-4 text-center ${isUrgent ? "bg-destructive/10" : "bg-muted"}`}
     >
       <p className="text-sm text-muted-foreground">Payment window expires in</p>
-      <p className={`text-3xl font-bold ${isUrgent ? "text-destructive" : "text-foreground"}`}>
+      <p
+        className={`text-3xl font-bold ${isUrgent ? "text-destructive" : "text-foreground"}`}
+      >
         {display}
       </p>
     </div>
@@ -225,12 +262,17 @@ function PaymentCountdown({ onExpire }: { onExpire: () => void }) {
 // ─── Invoice Detail Page ───────────────────────────────────────────────────────
 
 export function InvoiceDetailPage() {
-  const { invoice } = useLoaderData() as { invoice: Invoice };
+  const { invoice, expiresAt } = useLoaderData() as {
+    invoice: Invoice;
+    expiresAt: number | null;
+  };
   const params = useParams<{ id: string }>();
   const revalidator = useRevalidator();
   const user = useAuthStore((s) => s.user);
 
-  const [paymentState, setPaymentState] = useState<"idle" | "success" | "failure">("idle");
+  const [paymentState, setPaymentState] = useState<
+    "idle" | "success" | "failure"
+  >("idle");
   const [serverError, setServerError] = useState<string | null>(null);
 
   const isPatient = user?.role === "patient" || user?.role === "admin";
@@ -251,17 +293,14 @@ export function InvoiceDetailPage() {
           response?: { data?: { message?: string } };
         };
         setServerError(
-          axiosError.response?.data?.message ?? "Payment failed. Please try again."
+          axiosError.response?.data?.message ??
+            "Payment failed. Please try again."
         );
         setPaymentState("failure");
       }
     },
     [params.id, revalidator]
   );
-
-  const handleExpire = useCallback(() => {
-    setServerError("Payment window expired. Please refresh and try again.");
-  }, []);
 
   const isOverdue =
     (invoice.status === "pending" || invoice.status === "overdue") &&
@@ -291,7 +330,9 @@ export function InvoiceDetailPage() {
               INV-{invoice.id.split("-")[0].toUpperCase()}
             </p>
             <div className="mt-2">
-              <DetailStatusBadge status={isOverdue ? "overdue" : invoice.status} />
+              <DetailStatusBadge
+                status={isOverdue ? "overdue" : invoice.status}
+              />
             </div>
           </div>
           <div className="text-right">
@@ -317,7 +358,9 @@ export function InvoiceDetailPage() {
           </div>
           <div className="flex justify-between border-t pt-2 font-semibold">
             <span>Total</span>
-            <span data-testid="invoice-total">{formatCurrency(invoice.total)}</span>
+            <span data-testid="invoice-total">
+              {formatCurrency(invoice.total)}
+            </span>
           </div>
         </div>
 
@@ -328,9 +371,9 @@ export function InvoiceDetailPage() {
         </div>
 
         {/* Payment countdown — shown on pending invoices for patient/admin */}
-        {canPay && paymentState === "idle" && (
+        {canPay && paymentState === "idle" && expiresAt != null && (
           <div className="mt-6">
-            <PaymentCountdown onExpire={handleExpire} />
+            <PaymentCountdown expiresAt={expiresAt} />
           </div>
         )}
 
@@ -352,7 +395,8 @@ export function InvoiceDetailPage() {
           >
             <p className="font-semibold">Payment Successful!</p>
             <p className="mt-1 text-sm">
-              Your invoice has been paid. A confirmation will be sent to your email.
+              Your invoice has been paid. A confirmation will be sent to your
+              email.
             </p>
           </div>
         )}
@@ -365,7 +409,8 @@ export function InvoiceDetailPage() {
           >
             <p className="font-semibold">Payment Failed</p>
             <p className="mt-1 text-sm">
-              {serverError ?? "Your payment could not be processed. Please try again."}
+              {serverError ??
+                "Your payment could not be processed. Please try again."}
             </p>
           </div>
         )}

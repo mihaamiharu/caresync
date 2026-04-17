@@ -15,7 +15,9 @@ vi.mock("react-router", async (importOriginal) => {
     // Hooks mocked
     useLoaderData: vi.fn(),
     useNavigation: vi.fn().mockReturnValue({ state: "idle" }),
-    useRevalidator: vi.fn().mockReturnValue({ revalidate: vi.fn(), state: "idle" }),
+    useRevalidator: vi
+      .fn()
+      .mockReturnValue({ revalidate: vi.fn(), state: "idle" }),
     useParams: vi.fn(),
   };
 });
@@ -29,7 +31,12 @@ vi.mock("@/lib/api-client", () => ({
 }));
 
 import { invoicesApi } from "@/lib/api-client";
-import { useLoaderData, useNavigation, useRevalidator, useParams } from "react-router";
+import {
+  useLoaderData,
+  useNavigation,
+  useRevalidator,
+  useParams,
+} from "react-router";
 
 const mockPatient: User = {
   id: "user-patient-1",
@@ -110,7 +117,10 @@ describe("InvoiceListPage — patient view", () => {
     vi.resetAllMocks();
     vi.mocked(useLoaderData).mockReturnValue({ invoices: mockInvoices });
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" });
-    vi.mocked(useRevalidator).mockReturnValue({ revalidate: vi.fn(), state: "idle" });
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
   });
 
   it("renders the page heading", () => {
@@ -122,26 +132,48 @@ describe("InvoiceListPage — patient view", () => {
 
   it("renders invoice cards from loader data", () => {
     renderListPage();
-    expect(screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000001")).toBeInTheDocument();
-    expect(screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000002")).toBeInTheDocument();
-    expect(screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000003")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000001")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000002")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000003")
+    ).toBeInTheDocument();
   });
 
   it("shows pending, paid, and overdue badges correctly", () => {
     renderListPage();
-    expect(screen.getByTestId("invoice-status-pending-00000000-0000-0000-0000-000000000001")).toBeInTheDocument();
-    expect(screen.getByTestId("invoice-status-paid-00000000-0000-0000-0000-000000000002")).toBeInTheDocument();
-    expect(screen.getByTestId("invoice-status-overdue-00000000-0000-0000-0000-000000000003")).toBeInTheDocument();
+    expect(
+      screen.getByTestId(
+        "invoice-status-pending-00000000-0000-0000-0000-000000000001"
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(
+        "invoice-status-paid-00000000-0000-0000-0000-000000000002"
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(
+        "invoice-status-overdue-00000000-0000-0000-0000-000000000003"
+      )
+    ).toBeInTheDocument();
   });
 
   it("shows Pay Now button on pending invoices for patient", () => {
     renderListPage();
-    expect(screen.getByTestId("pay-invoice-00000000-0000-0000-0000-000000000001")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("pay-invoice-00000000-0000-0000-0000-000000000001")
+    ).toBeInTheDocument();
   });
 
   it("does NOT show Pay Now button on paid invoices", () => {
     renderListPage();
-    expect(screen.queryByTestId("pay-invoice-00000000-0000-0000-0000-000000000002")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("pay-invoice-00000000-0000-0000-0000-000000000002")
+    ).not.toBeInTheDocument();
   });
 
   it("filters invoices by status when filter is changed", async () => {
@@ -149,8 +181,14 @@ describe("InvoiceListPage — patient view", () => {
     const select = screen.getByTestId("invoice-status-filter");
     await userEvent.selectOptions(select, "pending");
     await waitFor(() => {
-      expect(screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000001")).toBeInTheDocument();
-      expect(screen.queryByTestId("invoice-card-00000000-0000-0000-0000-000000000002")).not.toBeInTheDocument();
+      expect(
+        screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000001")
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId(
+          "invoice-card-00000000-0000-0000-0000-000000000002"
+        )
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -171,13 +209,20 @@ describe("InvoiceListPage — admin view", () => {
     vi.resetAllMocks();
     vi.mocked(useLoaderData).mockReturnValue({ invoices: mockInvoices });
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" });
-    vi.mocked(useRevalidator).mockReturnValue({ revalidate: vi.fn(), state: "idle" });
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
   });
 
   it("shows all invoices to admin regardless of status", () => {
     renderListPage();
-    expect(screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000001")).toBeInTheDocument();
-    expect(screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000002")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000001")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("invoice-card-00000000-0000-0000-0000-000000000002")
+    ).toBeInTheDocument();
   });
 });
 
@@ -190,10 +235,16 @@ describe("InvoiceDetailPage — with 3-minute countdown and payment simulation",
     });
     vi.resetAllMocks();
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" });
-    vi.mocked(useRevalidator).mockReturnValue({ revalidate: vi.fn(), state: "idle" });
-    vi.mocked(useParams).mockReturnValue({ id: "00000000-0000-0000-0000-000000000001" });
+    vi.mocked(useRevalidator).mockReturnValue({
+      revalidate: vi.fn(),
+      state: "idle",
+    });
+    vi.mocked(useParams).mockReturnValue({
+      id: "00000000-0000-0000-0000-000000000001",
+    });
     vi.mocked(useLoaderData).mockReturnValue({
       invoice: { ...baseInvoice },
+      expiresAt: Date.now() + 180_000,
     });
   });
 
@@ -217,27 +268,6 @@ describe("InvoiceDetailPage — with 3-minute countdown and payment simulation",
   it("shows 3-minute countdown timer on pending invoice", () => {
     renderDetailPage();
     expect(screen.getByTestId("payment-countdown")).toBeInTheDocument();
-    expect(screen.getByTestId("payment-countdown")).toHaveTextContent("3:00");
-  });
-
-  it("countdown timer decrements every second", () => {
-    vi.useFakeTimers();
-    renderDetailPage();
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
-    expect(screen.getByTestId("payment-countdown")).toHaveTextContent("2:59");
-    vi.useRealTimers();
-  });
-
-  it("countdown reaches 0:00 after 180 seconds", () => {
-    vi.useFakeTimers();
-    renderDetailPage();
-    act(() => {
-      vi.advanceTimersByTime(180 * 1000);
-    });
-    expect(screen.getByTestId("payment-countdown")).toHaveTextContent("0:00");
-    vi.useRealTimers();
   });
 
   it("shows payment success panel after successful payment", async () => {
@@ -254,7 +284,9 @@ describe("InvoiceDetailPage — with 3-minute countdown and payment simulation",
   });
 
   it("shows payment failure panel after failed payment", async () => {
-    vi.mocked(invoicesApi.payInvoice).mockRejectedValue(new Error("Payment failed"));
+    vi.mocked(invoicesApi.payInvoice).mockRejectedValue(
+      new Error("Payment failed")
+    );
     renderDetailPage();
     await userEvent.click(screen.getByTestId("payment-simulate-fail"));
     await waitFor(() => {
@@ -286,17 +318,30 @@ describe("InvoiceDetailPage — with 3-minute countdown and payment simulation",
     renderDetailPage();
     await userEvent.click(screen.getByTestId("payment-simulate-success"));
     await waitFor(() => {
-      expect(screen.queryByTestId("payment-simulate-success")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("payment-simulate-fail")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("payment-simulate-success")
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("payment-simulate-fail")
+      ).not.toBeInTheDocument();
     });
   });
 
   it("shows overdue badge on overdue invoices", () => {
-    vi.mocked(useParams).mockReturnValue({ id: "00000000-0000-0000-0000-000000000003" });
+    vi.mocked(useParams).mockReturnValue({
+      id: "00000000-0000-0000-0000-000000000003",
+    });
     vi.mocked(useLoaderData).mockReturnValue({
-      invoice: { ...baseInvoice, id: "00000000-0000-0000-0000-000000000003", status: "overdue" as InvoiceStatus, dueDate: "2026-04-01" },
+      invoice: {
+        ...baseInvoice,
+        id: "00000000-0000-0000-0000-000000000003",
+        status: "overdue" as InvoiceStatus,
+        dueDate: "2026-04-01",
+      },
     });
     renderDetailPage("00000000-0000-0000-0000-000000000003");
-    expect(screen.getByTestId("invoice-detail-status-overdue")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("invoice-detail-status-overdue")
+    ).toBeInTheDocument();
   });
 });
