@@ -26,7 +26,11 @@ const errorResponse = z.object({ message: z.string() });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function getInvoiceWithPatient(invoiceId: string, userId: string, role: string) {
+async function getInvoiceWithPatient(
+  invoiceId: string,
+  userId: string,
+  role: string
+) {
   const [invoice] = await db
     .select()
     .from(invoices)
@@ -37,7 +41,8 @@ async function getInvoiceWithPatient(invoiceId: string, userId: string, role: st
 
 function canAccessInvoice(invoice: any, userId: string, role: string): boolean {
   if (role === "admin") return true;
-  if (role === "patient") return invoice.patientId === getPatientIdFromUserId(userId);
+  if (role === "patient")
+    return invoice.patientId === getPatientIdFromUserId(userId);
   return false;
 }
 
@@ -50,8 +55,13 @@ function getPatientIdFromUserId(userId: string): string | null {
 
 const createInvoiceBody = z.object({
   appointmentId: z.string().uuid("Invalid appointment ID"),
-  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Amount must be a valid number"),
-  tax: z.string().regex(/^\d+(\.\d{1,2})?$/, "Tax must be a valid number").optional(),
+  amount: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a valid number"),
+  tax: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Tax must be a valid number")
+    .optional(),
 });
 
 const createInvoiceRoute = createRoute({
@@ -120,7 +130,10 @@ invoicesRoute.openapi(createInvoiceRoute, async (c) => {
     .limit(1);
 
   if (existingInvoice) {
-    return c.json({ message: "Invoice already exists for this appointment" }, 409);
+    return c.json(
+      { message: "Invoice already exists for this appointment" },
+      409
+    );
   }
 
   // Calculate total
@@ -152,7 +165,13 @@ invoicesRoute.openapi(createInvoiceRoute, async (c) => {
 
 const listInvoicesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).openapi({ example: 1 }),
-  limit: z.coerce.number().int().min(1).max(100).default(20).openapi({ example: 20 }),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(20)
+    .openapi({ example: 20 }),
   status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
 });
 
@@ -268,11 +287,18 @@ invoicesRoute.openapi(listInvoicesRoute, async (c) => {
   if (whereCondition) {
     const [countRow] = await countQuery.where(whereCondition).limit(1);
     total = countRow.total;
-    rows = await baseQuery.where(whereCondition).orderBy(invoices.createdAt).offset(offset).limit(limit);
+    rows = await baseQuery
+      .where(whereCondition)
+      .orderBy(invoices.createdAt)
+      .offset(offset)
+      .limit(limit);
   } else {
     const [countRow] = await countQuery.limit(1);
     total = countRow.total;
-    rows = await baseQuery.orderBy(invoices.createdAt).offset(offset).limit(limit);
+    rows = await baseQuery
+      .orderBy(invoices.createdAt)
+      .offset(offset)
+      .limit(limit);
   }
 
   const data = rows.map((row) => ({
@@ -303,7 +329,7 @@ const getInvoiceRoute = createRoute({
   responses: {
     200: {
       description: "Invoice detail",
-      content: { "application/json": { schema: z.object({}).passthrough() } },
+      content: { "application/json": { schema: invoiceResponse } },
     },
     401: {
       description: "Not authenticated",
