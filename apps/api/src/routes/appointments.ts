@@ -9,6 +9,7 @@ import {
   doctors,
   doctorSchedules,
   users,
+  invoices,
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { computeAvailableSlots } from "../lib/schedule-service";
@@ -419,6 +420,43 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
     .set({ status: newStatus, updatedAt: new Date() })
     .where(eq(appointments.id, id))
     .returning();
+
+  // 5b. Auto-generate invoice when appointment is completed
+  if (newStatus === "completed") {
+    const [existingInvoice] = await db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(eq(invoices.appointmentId, id))
+      .limit(1);
+
+    if (!existingInvoice) {
+      // Default fee: 150000 IDR (consultation), 80000 (follow-up), 250000 (emergency)
+      const feeMap: Record<string, string> = {
+        consultation: "150000.00",
+        "follow-up": "80000.00",
+        emergency: "250000.00",
+      };
+      const amount = feeMap[row.appointment.type] ?? "100000.00";
+      const taxRate = 0.11; // 11% PPN
+      const taxAmount = (parseFloat(amount) * taxRate).toFixed(2);
+      const totalAmount = (parseFloat(amount) + parseFloat(taxAmount)).toFixed(2);
+
+      // Due date: 7 days from now
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 7);
+      const dueDateStr = dueDate.toISOString().substring(0, 10);
+
+      await db.insert(invoices).values({
+        appointmentId: id,
+        patientId: row.appointment.patientId,
+        amount,
+        tax: taxAmount,
+        total: totalAmount,
+        status: "pending",
+        dueDate: dueDateStr,
+      });
+    }
+  }
 
   // 6. Re-fetch full detail
   const updatedRows = await db

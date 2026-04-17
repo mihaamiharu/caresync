@@ -24,8 +24,8 @@ docker compose up --build
 | Service  | URL                        |
 | -------- | -------------------------- |
 | Web app  | http://localhost           |
-| API      | http://localhost:3000      |
-| API docs | http://localhost:3000/docs |
+| API      | http://localhost:3001      |
+| API docs | http://localhost:3001/docs |
 
 ## Local Development
 
@@ -46,7 +46,7 @@ pnpm --filter api db:seed
 pnpm dev
 ```
 
-The web app runs on http://localhost:5173 and the API on http://localhost:3000.
+The web app runs on http://localhost:5173 and the API on http://localhost:3001.
 
 ## Demo Accounts
 
@@ -116,7 +116,7 @@ pnpm --filter web test
 # E2E (requires running stack + env vars)
 ADMIN_EMAIL=admin@caresync.dev \
 ADMIN_PASSWORD=Password123! \
-API_URL=http://localhost:3000 \
+API_URL=http://localhost:3001 \
 pnpm test:e2e
 ```
 
@@ -128,7 +128,7 @@ pnpm test:e2e
 DATABASE_URL=postgresql://caresync:caresync123@localhost:5432/caresync
 JWT_SECRET=change-me
 JWT_REFRESH_SECRET=change-me-too
-PORT=3000
+PORT=3001
 ```
 
 ## Contributing

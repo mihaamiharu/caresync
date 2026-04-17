@@ -1,4 +1,8 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import {
+  createBrowserRouter,
+  Navigate,
+  LoaderFunctionArgs,
+} from "react-router";
 import { AppLayout } from "@/layouts/app-layout";
 import { DashboardPage } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
@@ -25,6 +29,12 @@ import {
   MedicalRecordDetailPage,
   medicalRecordDetailLoader,
 } from "@/pages/medical-records/detail";
+import {
+  InvoiceListPage,
+  InvoiceDetailPage,
+  invoicesLoader,
+  invoiceDetailLoader,
+} from "@/pages/invoices";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -106,6 +116,16 @@ export const router = createBrowserRouter([
             path: "/medical-records/:id",
             loader: medicalRecordDetailLoader,
             element: <MedicalRecordDetailPage />,
+          },
+          {
+            path: "/invoices",
+            loader: invoicesLoader,
+            element: <InvoiceListPage />,
+          },
+          {
+            path: "/invoices/:id",
+            loader: invoiceDetailLoader,
+            element: <InvoiceDetailPage />,
           },
         ],
       },
