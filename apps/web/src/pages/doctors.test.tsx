@@ -86,6 +86,8 @@ const mockDoctors: Doctor[] = [
       updatedAt: "2024-01-01",
     },
     department: mockDepts[0],
+    averageRating: null,
+    reviewCount: 0,
   },
 ];
 

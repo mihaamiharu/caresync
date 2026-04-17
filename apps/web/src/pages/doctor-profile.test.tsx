@@ -68,6 +68,8 @@ const mockDoctor: Doctor = {
     imageUrl: null,
     isActive: true,
   },
+  averageRating: null,
+  reviewCount: 0,
 };
 
 const mockSchedule: DoctorSchedule[] = [

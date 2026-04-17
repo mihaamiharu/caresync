@@ -1,5 +1,16 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, ilike, or, sql, and, asc, inArray } from "drizzle-orm";
+import {
+  eq,
+  ilike,
+  or,
+  sql,
+  and,
+  asc,
+  inArray,
+  avg,
+  count,
+  desc,
+} from "drizzle-orm";
 import { db } from "../db";
 import {
   users,
@@ -8,6 +19,8 @@ import {
   appointments,
   medicalRecords,
   doctorSchedules,
+  reviews,
+  patients,
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { hashPassword } from "../lib/password";
@@ -42,6 +55,8 @@ const doctorResponse = z.object({
   licenseNumber: z.string(),
   user: userResponse.optional(),
   department: departmentResponse.optional(),
+  averageRating: z.number().nullable().optional(),
+  reviewCount: z.number().nullable().optional(),
 });
 
 const errorResponse = z.object({ message: z.string() });
@@ -225,7 +240,126 @@ doctorsRoute.openapi(getDoctorRoute, async (c) => {
     return c.json({ message: "Doctor not found" }, 404);
   }
 
-  return c.json(doctor, 200);
+  const [stats] = await db
+    .select({
+      averageRating: sql<number | null>`avg(rating)::float`,
+      reviewCount: count(reviews.id),
+    })
+    .from(reviews)
+    .where(eq(reviews.doctorId, id));
+
+  return c.json(
+    {
+      ...doctor,
+      averageRating: stats?.averageRating ?? null,
+      reviewCount: Number(stats?.reviewCount) ?? 0,
+    },
+    200
+  );
+});
+
+// ─── GET /doctors/:id/reviews ────────────────────────────────────────────────
+
+const getDoctorReviewsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1).openapi({ example: 1 }),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(5)
+    .openapi({ example: 5 }),
+});
+
+const doctorReviewItem = z.object({
+  id: z.string(),
+  appointmentId: z.string(),
+  doctorId: z.string(),
+  rating: z.number(),
+  comment: z.string().nullable(),
+  createdAt: z.string(),
+  patientFirstName: z.string(),
+  patientLastName: z.string(),
+});
+
+const paginatedDoctorReviewsResponse = z.object({
+  data: z.array(doctorReviewItem),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  totalPages: z.number(),
+});
+
+const getDoctorReviewsRoute = createRoute({
+  method: "get",
+  path: "/doctors/{id}/reviews",
+  tags: ["Doctors"],
+  summary: "Get paginated reviews for a doctor",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireAuth] as const,
+  request: {
+    params: z.object({ id: z.string() }),
+    query: getDoctorReviewsQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "Paginated doctor reviews",
+      content: {
+        "application/json": { schema: paginatedDoctorReviewsResponse },
+      },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    500: {
+      description: "Internal server error",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+doctorsRoute.openapi(getDoctorReviewsRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const { page, limit } = c.req.valid("query");
+  const offset = (page - 1) * limit;
+
+  const [countRow] = await db
+    .select({ count: count(reviews.id) })
+    .from(reviews)
+    .where(eq(reviews.doctorId, id));
+
+  const total = countRow?.count ?? 0;
+
+  const rows = await db
+    .select({
+      id: reviews.id,
+      appointmentId: reviews.appointmentId,
+      doctorId: reviews.doctorId,
+      rating: reviews.rating,
+      comment: reviews.comment,
+      createdAt: reviews.createdAt,
+      patientFirstName: users.firstName,
+      patientLastName: users.lastName,
+    })
+    .from(reviews)
+    .innerJoin(patients, eq(reviews.patientId, patients.id))
+    .innerJoin(users, eq(patients.userId, users.id))
+    .where(eq(reviews.doctorId, id))
+    .orderBy(desc(reviews.createdAt))
+    .offset(offset)
+    .limit(limit);
+
+  return c.json(
+    {
+      data: rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+    200
+  );
 });
 
 // ─── POST /doctors (admin) ───────────────────────────────────────────────────

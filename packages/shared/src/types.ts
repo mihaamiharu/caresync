@@ -37,6 +37,8 @@ export interface Doctor {
   licenseNumber: string;
   user?: User;
   department?: Department;
+  averageRating: number | null;
+  reviewCount: number;
 }
 
 export interface DoctorSchedule {
@@ -154,6 +156,25 @@ export interface Review {
   comment: string | null;
   createdAt: string;
   patient?: Patient;
+}
+
+export interface DoctorReview {
+  id: string;
+  appointmentId: string;
+  doctorId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  patientFirstName: string;
+  patientLastName: string;
+}
+
+export interface PaginatedDoctorReviewsResponse {
+  data: DoctorReview[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface Notification {
