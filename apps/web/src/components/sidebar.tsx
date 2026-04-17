@@ -12,6 +12,7 @@ import {
   User,
   HeartPulse,
   LogOut,
+  PillIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -33,6 +34,12 @@ const navItems = [
     to: "/medical-records",
     label: "Medical Records",
     icon: FileText,
+    roles: null,
+  },
+  {
+    to: "/prescriptions",
+    label: "Prescriptions",
+    icon: PillIcon,
     roles: null,
   },
   { to: "/invoices", label: "Invoices", icon: Receipt, roles: null },

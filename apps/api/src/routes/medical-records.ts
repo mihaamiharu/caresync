@@ -7,6 +7,8 @@ import { db } from "../db";
 import {
   medicalRecords,
   medicalRecordAttachments,
+  prescriptions,
+  prescriptionItems,
   appointments,
   patients,
   doctors,
@@ -62,6 +64,25 @@ const medicalRecordSchema = z.object({
   appointment: appointmentSummarySchema.optional(),
   doctor: doctorSummarySchema.optional(),
   attachments: z.array(attachmentSchema).optional(),
+  prescription: z
+    .object({
+      id: z.string(),
+      notes: z.string().nullable(),
+      createdAt: z.string(),
+      items: z.array(
+        z.object({
+          id: z.string(),
+          prescriptionId: z.string(),
+          medicationName: z.string(),
+          dosage: z.string(),
+          frequency: z.string(),
+          duration: z.string(),
+          instructions: z.string().nullable(),
+        })
+      ),
+    })
+    .nullable()
+    .optional(),
 });
 
 // ─── POST /medical-records (doctor only) ──────────────────────────────────────
@@ -409,6 +430,38 @@ medicalRecordsRoute.openapi(getMedicalRecordRoute, async (c) => {
     .from(medicalRecordAttachments)
     .where(eq(medicalRecordAttachments.medicalRecordId, row.id));
 
+  const [prescription] = await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.medicalRecordId, row.id))
+    .limit(1);
+
+  let prescriptionData = null;
+  if (prescription) {
+    const items = await db
+      .select()
+      .from(prescriptionItems)
+      .where(eq(prescriptionItems.prescriptionId, prescription.id));
+
+    prescriptionData = {
+      id: prescription.id,
+      notes: prescription.notes,
+      createdAt:
+        prescription.createdAt instanceof Date
+          ? prescription.createdAt.toISOString()
+          : String(prescription.createdAt),
+      items: items.map((item) => ({
+        id: item.id,
+        prescriptionId: item.prescriptionId,
+        medicationName: item.medicationName,
+        dosage: item.dosage,
+        frequency: item.frequency,
+        duration: item.duration,
+        instructions: item.instructions,
+      })),
+    };
+  }
+
   return c.json(
     {
       id: row.id,
@@ -435,6 +488,7 @@ medicalRecordsRoute.openapi(getMedicalRecordRoute, async (c) => {
         },
       },
       attachments,
+      prescription: prescriptionData,
     },
     200
   );
