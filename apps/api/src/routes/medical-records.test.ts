@@ -148,6 +148,24 @@ function makeSelectWhereChain(result: unknown[]) {
   return { from };
 }
 
+// Full chain with .limit() support — used for prescription queries
+function makeFullSelectChain(result: unknown[]) {
+  const chain: any = {};
+  const joinable: any = {};
+  joinable.innerJoin = vi.fn().mockReturnValue(joinable);
+  joinable.where = vi.fn().mockReturnValue(chain);
+  joinable.from = vi.fn().mockReturnValue(joinable);
+  chain.from = vi.fn().mockReturnValue(joinable);
+  chain.innerJoin = vi.fn().mockReturnValue(joinable);
+  chain.where = vi.fn().mockReturnValue(chain);
+  chain.limit = vi.fn().mockResolvedValue(result);
+  chain.orderBy = vi.fn().mockResolvedValue(result);
+  chain.offset = vi
+    .fn()
+    .mockReturnValue({ limit: vi.fn().mockResolvedValue(result) });
+  return chain;
+}
+
 // ─── POST /medical-records ────────────────────────────────────────────────────
 
 describe("POST /medical-records", () => {
@@ -391,7 +409,8 @@ describe("GET /medical-records/:id", () => {
   it("admin can access any record", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
-      .mockReturnValueOnce(makeSelectWhereChain([]) as any); // attachments query
+      .mockReturnValueOnce(makeSelectWhereChain([]) as any) // attachments query
+      .mockReturnValueOnce(makeFullSelectChain([]) as any); // prescription query (none exists)
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(adminToken),
@@ -406,7 +425,8 @@ describe("GET /medical-records/:id", () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
       .mockReturnValueOnce(makeSelectChain([mockDoctor]) as any)
-      .mockReturnValueOnce(makeSelectWhereChain([]) as any); // attachments query
+      .mockReturnValueOnce(makeSelectWhereChain([]) as any) // attachments query
+      .mockReturnValueOnce(makeFullSelectChain([]) as any); // prescription query (none exists)
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(doctorToken),
@@ -431,7 +451,8 @@ describe("GET /medical-records/:id", () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
       .mockReturnValueOnce(makeSelectChain([mockPatient]) as any)
-      .mockReturnValueOnce(makeSelectWhereChain([]) as any); // attachments query
+      .mockReturnValueOnce(makeSelectWhereChain([]) as any) // attachments query
+      .mockReturnValueOnce(makeFullSelectChain([]) as any); // prescription query (none exists)
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(patientToken),
@@ -455,7 +476,8 @@ describe("GET /medical-records/:id", () => {
   it("response includes attachments array", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeJoinChain([mockRecordRow]) as any)
-      .mockReturnValueOnce(makeSelectWhereChain([mockAttachment]) as any); // attachments query
+      .mockReturnValueOnce(makeSelectWhereChain([mockAttachment]) as any) // attachments query
+      .mockReturnValueOnce(makeFullSelectChain([]) as any); // prescription query (none exists)
 
     const res = await app.request(`${BASE_URL}/${RECORD_ID}`, {
       headers: bearer(adminToken),

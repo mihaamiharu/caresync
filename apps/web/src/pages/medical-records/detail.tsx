@@ -1,10 +1,24 @@
 import { useRef, useState } from "react";
 import { useLoaderData, Link, useRevalidator } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import {
+  useForm,
+  useFieldArray,
+  Controller,
+  type Control,
+} from "react-hook-form";
 import { toast } from "sonner";
-import { medicalRecordsApi } from "@/lib/api-client";
+import { medicalRecordsApi, prescriptionsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { MedicalRecord, MedicalRecordAttachment } from "@caresync/shared";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // ─── Loader ────────────────────────────────────────────────────────────────────
 
@@ -184,12 +198,313 @@ function AttachmentsCard({
   );
 }
 
+// ─── PrescriptionModal ────────────────────────────────────────────────────────
+
+interface MedicationItem {
+  medicationName: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+}
+
+interface PrescriptionFormData {
+  notes?: string;
+  items: MedicationItem[];
+}
+
+function PrescriptionModal({
+  medicalRecordId,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  medicalRecordId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<PrescriptionFormData>({
+    defaultValues: {
+      notes: "",
+      items: [
+        {
+          medicationName: "",
+          dosage: "",
+          frequency: "",
+          duration: "",
+          instructions: "",
+        },
+      ],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "items",
+  });
+
+  async function onSubmit(data: PrescriptionFormData) {
+    setSubmitting(true);
+    try {
+      await prescriptionsApi.create({
+        medicalRecordId,
+        notes: data.notes || null,
+        items: data.items.map((item) => ({
+          medicationName: item.medicationName,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          instructions: item.instructions || null,
+        })),
+      });
+      toast.success("Prescription created successfully");
+      reset();
+      onOpenChange(false);
+      onSuccess();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Failed to create prescription";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Prescription</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-1">Notes</label>
+            <textarea
+              {...register("notes")}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              rows={2}
+              placeholder="Optional notes..."
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium">Medications</label>
+              <button
+                type="button"
+                onClick={() =>
+                  append({
+                    medicationName: "",
+                    dosage: "",
+                    frequency: "",
+                    duration: "",
+                    instructions: "",
+                  })
+                }
+                className="text-sm text-primary hover:underline"
+              >
+                + Add medication
+              </button>
+            </div>
+
+            {errors.items?.root && (
+              <p className="text-sm text-destructive mb-2">
+                {errors.items.root.message}
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {fields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="grid grid-cols-6 gap-2 rounded-lg border border-border p-3"
+                >
+                  <div className="col-span-2">
+                    <input
+                      {...register(`items.${index}.medicationName`, {
+                        required: "Required",
+                      })}
+                      placeholder="Medication name"
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    />
+                    {errors.items?.[index]?.medicationName && (
+                      <p className="text-xs text-destructive mt-0.5">
+                        Required
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      {...register(`items.${index}.dosage`, {
+                        required: "Required",
+                      })}
+                      placeholder="Dosage"
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    />
+                    {errors.items?.[index]?.dosage && (
+                      <p className="text-xs text-destructive mt-0.5">
+                        Required
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      {...register(`items.${index}.frequency`, {
+                        required: "Required",
+                      })}
+                      placeholder="Frequency"
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    />
+                    {errors.items?.[index]?.frequency && (
+                      <p className="text-xs text-destructive mt-0.5">
+                        Required
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      {...register(`items.${index}.duration`, {
+                        required: "Required",
+                      })}
+                      placeholder="Duration"
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    />
+                    {errors.items?.[index]?.duration && (
+                      <p className="text-xs text-destructive mt-0.5">
+                        Required
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-1 flex items-start">
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="mt-1.5 text-sm text-destructive hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <div className="col-span-6">
+                    <input
+                      {...register(`items.${index}.instructions`)}
+                      placeholder="Instructions (optional)"
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Saving..." : "Save Prescription"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── PrescriptionCard ─────────────────────────────────────────────────────────
+
+function PrescriptionCard({
+  prescription,
+  medicalRecordId,
+  appointmentStatus,
+  userRole,
+  onAddClick,
+}: {
+  prescription?: {
+    id: string;
+    notes: string | null;
+    items?: { id: string }[];
+  } | null;
+  medicalRecordId: string;
+  appointmentStatus?: string;
+  userRole: string;
+  onAddClick: () => void;
+}) {
+  const isDoctor = userRole === "doctor";
+  const eligibleStatuses = ["confirmed", "in-progress", "completed"];
+  const canAdd =
+    isDoctor &&
+    appointmentStatus &&
+    eligibleStatuses.includes(appointmentStatus) &&
+    !prescription;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-6">
+      <h2 className="mb-4 text-base font-semibold text-foreground">
+        Prescription
+      </h2>
+
+      {prescription ? (
+        <div>
+          <p className="text-sm text-muted-foreground mb-2">
+            {prescription.items?.length ?? 0} medication
+            {(prescription.items?.length ?? 0) !== 1 ? "s" : ""}
+          </p>
+          {prescription.notes && (
+            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+              {prescription.notes}
+            </p>
+          )}
+          <Link
+            to={`/prescriptions/${prescription.id}`}
+            className="text-sm text-primary hover:underline"
+          >
+            View Prescription →
+          </Link>
+        </div>
+      ) : canAdd ? (
+        <div>
+          <p className="text-sm text-muted-foreground mb-3">
+            No prescription for this medical record yet.
+          </p>
+          <button
+            onClick={onAddClick}
+            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+          >
+            Add Prescription
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          No prescription for this medical record.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export function MedicalRecordDetailPage() {
   const record = useLoaderData() as MedicalRecord;
   const revalidator = useRevalidator();
   const role = useAuthStore((s) => s.user?.role ?? "");
+  const [prescriptionModalOpen, setPrescriptionModalOpen] = useState(false);
 
   const doctorName = record.doctor
     ? `Dr. ${record.doctor.user.firstName} ${record.doctor.user.lastName}`
@@ -318,6 +633,24 @@ export function MedicalRecordDetailPage() {
           onUpload={handleUpload}
         />
       </div>
+
+      {/* Prescription */}
+      <div className="mt-6">
+        <PrescriptionCard
+          prescription={record.prescription}
+          medicalRecordId={record.id}
+          appointmentStatus={record.appointment?.status}
+          userRole={role}
+          onAddClick={() => setPrescriptionModalOpen(true)}
+        />
+      </div>
+
+      <PrescriptionModal
+        medicalRecordId={record.id}
+        open={prescriptionModalOpen}
+        onOpenChange={setPrescriptionModalOpen}
+        onSuccess={() => revalidator.revalidate()}
+      />
     </div>
   );
 }
