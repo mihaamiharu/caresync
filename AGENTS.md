@@ -53,8 +53,8 @@ Its `package.json` has no build script for consumers — workspace resolution ha
 | Service           | URL                            |
 | ----------------- | ------------------------------ |
 | Web (dev)         | http://localhost:5173          |
-| API               | http://localhost:3000          |
-| API docs (Scalar) | http://localhost:3000/api/docs |
+| API               | http://localhost:3001          |
+| API docs (Scalar) | http://localhost:3001/api/docs |
 
 ## Key Files
 

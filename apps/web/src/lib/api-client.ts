@@ -12,6 +12,7 @@ import type {
   AppointmentType,
   MedicalRecord,
   MedicalRecordAttachment,
+  Invoice,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -420,6 +421,36 @@ export const medicalRecordsApi = {
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
+    return res.data;
+  },
+};
+
+// ─── Invoices API ─────────────────────────────────────────────────────────────
+
+interface ListInvoicesParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+}
+
+export const invoicesApi = {
+  listInvoices: async (
+    params?: ListInvoicesParams
+  ): Promise<{ data: Invoice[]; total: number }> => {
+    const res = await apiClient.get<{ data: Invoice[]; total: number }>(
+      "/api/v1/invoices",
+      { params }
+    );
+    return res.data;
+  },
+
+  getInvoice: async (id: string): Promise<Invoice> => {
+    const res = await apiClient.get<Invoice>(`/api/v1/invoices/${id}`);
+    return res.data;
+  },
+
+  payInvoice: async (id: string): Promise<Invoice> => {
+    const res = await apiClient.post<Invoice>(`/api/v1/invoices/${id}/pay`);
     return res.data;
   },
 };

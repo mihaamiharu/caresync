@@ -25,6 +25,12 @@ import {
   MedicalRecordDetailPage,
   medicalRecordDetailLoader,
 } from "@/pages/medical-records/detail";
+import {
+  InvoiceListPage,
+  InvoiceDetailPage,
+  invoicesLoader,
+  invoiceDetailLoader,
+} from "@/pages/invoices";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -106,6 +112,16 @@ export const router = createBrowserRouter([
             path: "/medical-records/:id",
             loader: medicalRecordDetailLoader,
             element: <MedicalRecordDetailPage />,
+          },
+          {
+            path: "/invoices",
+            loader: invoicesLoader,
+            element: <InvoiceListPage />,
+          },
+          {
+            path: "/invoices/:id",
+            loader: invoiceDetailLoader,
+            element: <InvoiceDetailPage />,
           },
         ],
       },
