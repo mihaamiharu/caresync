@@ -32,13 +32,23 @@ const subscribe = () => {
   const id = setInterval(tick, 1000);
   return () => clearInterval(id);
 };
-const getSnapshot = () => 0;
+const getSnapshot = () => Date.now();
 
 function useNow() {
   return useSyncExternalStore(subscribe, tick, getSnapshot);
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function getEffectiveStatus(invoice: Invoice): InvoiceStatus {
+  if (
+    (invoice.status === "pending" || invoice.status === "overdue") &&
+    new Date(invoice.dueDate) < new Date()
+  ) {
+    return "overdue";
+  }
+  return invoice.status;
+}
 
 function formatCurrency(amount: string | number): string {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -102,8 +112,7 @@ interface InvoiceCardProps {
 }
 
 function InvoiceCard({ invoice, showPayButton, onPay }: InvoiceCardProps) {
-  const isOverdue =
-    invoice.status === "pending" && new Date(invoice.dueDate) < new Date();
+  const effectiveStatus = getEffectiveStatus(invoice);
 
   return (
     <div
@@ -121,12 +130,12 @@ function InvoiceCard({ invoice, showPayButton, onPay }: InvoiceCardProps) {
           <p className="text-xs text-muted-foreground">
             Due: {formatDate(invoice.dueDate)}
           </p>
-          {isOverdue && invoice.status !== "overdue" && (
+          {effectiveStatus === "overdue" && invoice.status !== "overdue" && (
             <p className="mt-1 text-xs font-medium text-destructive">Overdue</p>
           )}
         </div>
         <div className="flex flex-col items-end gap-2">
-          <StatusBadge status={invoice.status} invoiceId={invoice.id} />
+          <StatusBadge status={effectiveStatus} invoiceId={invoice.id} />
           {showPayButton && invoice.status === "pending" && (
             <a
               href={`/invoices/${invoice.id}`}
@@ -299,9 +308,7 @@ export function InvoiceDetailPage() {
     [params.id, revalidator]
   );
 
-  const isOverdue =
-    (invoice.status === "pending" || invoice.status === "overdue") &&
-    new Date(invoice.dueDate) < new Date();
+  const isOverdue = getEffectiveStatus(invoice) === "overdue";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
