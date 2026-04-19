@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useParams, Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { appointmentsApi, medicalRecordsApi } from "@/lib/api-client";
+import {
+  appointmentsApi,
+  medicalRecordsApi,
+  reviewsApi,
+} from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type {
   Appointment,
   AppointmentStatus,
   MedicalRecord,
+  Review,
 } from "@caresync/shared";
 import { StatusBadge } from "./components/StatusBadge";
 
@@ -256,6 +261,206 @@ function MedicalRecordSection({
   );
 }
 
+// ─── Star Picker ─────────────────────────────────────────────────────────────
+
+interface StarPickerProps {
+  value: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}
+
+function StarPicker({ value, onChange, disabled }: StarPickerProps) {
+  return (
+    <div className="flex gap-1" data-testid="star-picker">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          data-testid={`star-${star}`}
+          disabled={disabled}
+          onClick={() => onChange(star)}
+          className={`text-2xl transition-colors ${disabled ? "cursor-default" : "cursor-pointer hover:scale-110"}`}
+        >
+          {star <= value ? (
+            <span className="text-yellow-400">★</span>
+          ) : (
+            <span className="text-gray-300">☆</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Review Section ───────────────────────────────────────────────────────────
+
+interface ReviewSectionProps {
+  appointmentId: string;
+  isPatient: boolean;
+  status: AppointmentStatus;
+}
+
+function ReviewSection({
+  appointmentId,
+  isPatient,
+  status,
+}: ReviewSectionProps) {
+  const [existingReview, setExistingReview] = useState<Review | null>(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(isPatient && status === "completed");
+
+  useSyncExternalStore(
+    () => () => {},
+    () =>
+      (loading
+        ? "loading"
+        : done || existingReview
+          ? "reviewed"
+          : "form") as string,
+    () => "loading"
+  );
+
+  // Load existing review (only for completed appointments owned by patient)
+  if (isPatient && status === "completed" && loading) {
+    const cancelled = false;
+    reviewsApi
+      .getByAppointment(appointmentId)
+      .then((review) => {
+        if (!cancelled) {
+          setExistingReview(review);
+          setDone(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return <div className="py-4 text-sm text-muted-foreground">Loading…</div>;
+  }
+
+  if (!isPatient || status !== "completed") return null;
+  if (loading) return null;
+
+  if (done || existingReview) {
+    return (
+      <div
+        className="rounded-lg border border-border bg-card p-6"
+        data-testid="review-submitted"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-green-500 text-xl">✓</span>
+          <h2 className="text-base font-semibold text-foreground">
+            Review Submitted
+          </h2>
+        </div>
+        {existingReview && (
+          <div className="mt-3">
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-yellow-400">
+                {"★".repeat(existingReview.rating)}
+              </span>
+              <span className="text-gray-300">
+                {"☆".repeat(5 - existingReview.rating)}
+              </span>
+            </div>
+            {existingReview.comment && (
+              <p className="text-sm text-muted-foreground">
+                {existingReview.comment}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating === 0) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await reviewsApi.create({
+        appointmentId,
+        rating,
+        comment: comment || null,
+      });
+      setDone(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? "Failed to submit review.";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-lg border border-border bg-card p-6"
+      data-testid="review-section"
+    >
+      <h2 className="mb-4 text-base font-semibold text-foreground">
+        How was your visit?
+      </h2>
+
+      {error && (
+        <p
+          data-testid="review-error"
+          className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {error}
+        </p>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium mb-2 block">Rating</label>
+          <StarPicker
+            value={rating}
+            onChange={setRating}
+            disabled={submitting}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="review-comment" className="text-sm font-medium">
+            Comment{" "}
+            <span className="text-muted-foreground font-normal">
+              (optional)
+            </span>
+          </label>
+          <textarea
+            id="review-comment"
+            data-testid="review-comment-input"
+            rows={3}
+            maxLength={500}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            disabled={submitting}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+            placeholder="Share your experience…"
+          />
+          <p className="text-xs text-muted-foreground text-right">
+            {comment.length}/500
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          data-testid="review-submit"
+          disabled={submitting || rating === 0}
+          className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {submitting ? "Submitting…" : "Submit Review"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export function AppointmentDetailPage() {
@@ -446,6 +651,13 @@ export function AppointmentDetailPage() {
           appointmentId={appointment.id}
           initialRecord={initialRecord}
           role={user?.role}
+          status={status}
+        />
+
+        {/* Review section */}
+        <ReviewSection
+          appointmentId={appointment.id}
+          isPatient={user?.role === "patient"}
           status={status}
         />
       </div>

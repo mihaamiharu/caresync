@@ -13,6 +13,9 @@ import type {
   MedicalRecord,
   MedicalRecordAttachment,
   Invoice,
+  Review,
+  DoctorReview,
+  PaginatedDoctorReviewsResponse,
   PrescriptionResponse,
   CreatePrescriptionInput,
   UpdatePrescriptionInput,
@@ -423,6 +426,42 @@ export const medicalRecordsApi = {
       `/api/v1/medical-records/${recordId}/attachments`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    return res.data;
+  },
+};
+
+// ─── Reviews API ─────────────────────────────────────────────────────────────
+
+export interface CreateReviewInput {
+  appointmentId: string;
+  rating: number;
+  comment?: string | null;
+}
+
+export const reviewsApi = {
+  /** POST /api/v1/reviews */
+  create: async (data: CreateReviewInput): Promise<Review> => {
+    const res = await apiClient.post<Review>("/api/v1/reviews", data);
+    return res.data;
+  },
+
+  /** GET /api/v1/reviews/appointment/:appointmentId */
+  getByAppointment: async (appointmentId: string): Promise<Review> => {
+    const res = await apiClient.get<Review>(
+      `/api/v1/reviews/appointment/${appointmentId}`
+    );
+    return res.data;
+  },
+
+  /** GET /api/v1/doctors/:id/reviews */
+  getByDoctor: async (
+    doctorId: string,
+    params?: { page?: number; limit?: number }
+  ): Promise<PaginatedDoctorReviewsResponse> => {
+    const res = await apiClient.get<PaginatedDoctorReviewsResponse>(
+      `/api/v1/doctors/${doctorId}/reviews`,
+      { params }
     );
     return res.data;
   },

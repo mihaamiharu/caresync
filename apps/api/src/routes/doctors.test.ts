@@ -41,9 +41,11 @@ const mockDoctor = {
 
 // ─── Mock chain helpers ────────────────────────────────────────────────────────
 
-function makeSelectChain(result: unknown[]) {
+function makeSelectChain(result: unknown[], opts?: { countQuery?: boolean }) {
   const limit = vi.fn().mockResolvedValue(result);
-  const where = vi.fn().mockReturnValue({ limit });
+  const where = opts?.countQuery
+    ? vi.fn().mockResolvedValue(result)
+    : vi.fn().mockReturnValue({ limit });
   const innerJoin = vi.fn().mockReturnValue({
     innerJoin: vi.fn().mockReturnValue({ where, limit }),
     where,
@@ -126,12 +128,21 @@ describe("GET /doctors", () => {
 // ─── GET /doctors/:id ──────────────────────────────────────────────────────────
 
 describe("GET /doctors/:id", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (db.select as any).mockReset();
+  });
 
   it("returns 200 with doctor for anyone", async () => {
-    vi.mocked(db.select).mockReturnValueOnce(
-      makeSelectChain([mockDoctor]) as any
-    );
+    // Use mockImplementationOnce per-call to avoid queue interference from other test files
+    (db.select as any)
+      .mockImplementationOnce(() => makeSelectChain([mockDoctor]) as any) // doctor query
+      .mockImplementationOnce(
+        () =>
+          makeSelectChain([{ averageRating: 4.5, reviewCount: 10 }], {
+            countQuery: true,
+          }) as any
+      ); // stats query
 
     const res = await app.request(
       `${BASE}/00000000-0000-0000-0000-000000000001`
@@ -141,6 +152,8 @@ describe("GET /doctors/:id", () => {
     const body = await res.json();
     expect(body.id).toBe("00000000-0000-0000-0000-000000000001");
     expect(body.user.lastName).toBe("Smith");
+    expect(body.averageRating).toBe(4.5);
+    expect(body.reviewCount).toBe(10);
   });
 
   it("returns 404 when doctor does not exist", async () => {
