@@ -106,6 +106,7 @@ export interface MedicalRecord {
   appointment?: MedicalRecordAppointmentSummary;
   doctor?: MedicalRecordDoctorSummary;
   attachments?: MedicalRecordAttachment[];
+  prescription?: Prescription | null;
 }
 
 export interface MedicalRecordAttachment {

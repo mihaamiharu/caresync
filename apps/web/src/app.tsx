@@ -35,6 +35,14 @@ import {
   invoicesLoader,
   invoiceDetailLoader,
 } from "@/pages/invoices";
+import {
+  PrescriptionsPage,
+  prescriptionsLoader,
+} from "@/pages/prescriptions/index";
+import {
+  PrescriptionDetailPage,
+  prescriptionDetailLoader,
+} from "@/pages/prescriptions/detail";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -126,6 +134,16 @@ export const router = createBrowserRouter([
             path: "/invoices/:id",
             loader: invoiceDetailLoader,
             element: <InvoiceDetailPage />,
+          },
+          {
+            path: "/prescriptions",
+            loader: prescriptionsLoader,
+            element: <PrescriptionsPage />,
+          },
+          {
+            path: "/prescriptions/:id",
+            loader: prescriptionDetailLoader,
+            element: <PrescriptionDetailPage />,
           },
         ],
       },

@@ -16,6 +16,9 @@ import type {
   Review,
   DoctorReview,
   PaginatedDoctorReviewsResponse,
+  PrescriptionResponse,
+  CreatePrescriptionInput,
+  UpdatePrescriptionInput,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -490,6 +493,56 @@ export const invoicesApi = {
 
   payInvoice: async (id: string): Promise<Invoice> => {
     const res = await apiClient.post<Invoice>(`/api/v1/invoices/${id}/pay`);
+    return res.data;
+  },
+};
+
+// ─── Prescriptions API ────────────────────────────────────────────────────────
+
+interface ListPrescriptionsParams {
+  page?: number;
+  limit?: number;
+  medicalRecordId?: string;
+  patientId?: string;
+  doctorId?: string;
+}
+
+export const prescriptionsApi = {
+  list: async (
+    params?: ListPrescriptionsParams
+  ): Promise<PaginatedResponse<PrescriptionResponse>> => {
+    const res = await apiClient.get<PaginatedResponse<PrescriptionResponse>>(
+      "/api/v1/prescriptions",
+      { params }
+    );
+    return res.data;
+  },
+
+  get: async (id: string): Promise<PrescriptionResponse> => {
+    const res = await apiClient.get<PrescriptionResponse>(
+      `/api/v1/prescriptions/${id}`
+    );
+    return res.data;
+  },
+
+  create: async (
+    data: CreatePrescriptionInput
+  ): Promise<PrescriptionResponse> => {
+    const res = await apiClient.post<PrescriptionResponse>(
+      "/api/v1/prescriptions",
+      data
+    );
+    return res.data;
+  },
+
+  update: async (
+    id: string,
+    data: UpdatePrescriptionInput
+  ): Promise<PrescriptionResponse> => {
+    const res = await apiClient.put<PrescriptionResponse>(
+      `/api/v1/prescriptions/${id}`,
+      data
+    );
     return res.data;
   },
 };
