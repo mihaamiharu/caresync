@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useParams, Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import {
@@ -14,6 +14,7 @@ import type {
   Review,
 } from "@caresync/shared";
 import { StatusBadge } from "./components/StatusBadge";
+import { StarRating } from "@/components/ui/StarRating";
 
 // ─── Loader ────────────────────────────────────────────────────────────────────
 
@@ -261,37 +262,6 @@ function MedicalRecordSection({
   );
 }
 
-// ─── Star Picker ─────────────────────────────────────────────────────────────
-
-interface StarPickerProps {
-  value: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}
-
-function StarPicker({ value, onChange, disabled }: StarPickerProps) {
-  return (
-    <div className="flex gap-1" data-testid="star-picker">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          data-testid={`star-${star}`}
-          disabled={disabled}
-          onClick={() => onChange(star)}
-          className={`text-2xl transition-colors ${disabled ? "cursor-default" : "cursor-pointer hover:scale-110"}`}
-        >
-          {star <= value ? (
-            <span className="text-yellow-400">★</span>
-          ) : (
-            <span className="text-gray-300">☆</span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ─── Review Section ───────────────────────────────────────────────────────────
 
 interface ReviewSectionProps {
@@ -313,17 +283,6 @@ function ReviewSection({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(isPatient && status === "completed");
 
-  useSyncExternalStore(
-    () => () => {},
-    () =>
-      (loading
-        ? "loading"
-        : done || existingReview
-          ? "reviewed"
-          : "form") as string,
-    () => "loading"
-  );
-
   // Load existing review (only for completed appointments owned by patient)
   if (isPatient && status === "completed" && loading) {
     const cancelled = false;
@@ -333,6 +292,7 @@ function ReviewSection({
         if (!cancelled) {
           setExistingReview(review);
           setDone(true);
+          setLoading(false);
         }
       })
       .catch(() => {
@@ -356,19 +316,12 @@ function ReviewSection({
             Review Submitted
           </h2>
         </div>
-        {existingReview && (
+        {(existingReview || (done && rating > 0)) && (
           <div className="mt-3">
-            <div className="flex items-center gap-1 mb-1">
-              <span className="text-yellow-400">
-                {"★".repeat(existingReview.rating)}
-              </span>
-              <span className="text-gray-300">
-                {"☆".repeat(5 - existingReview.rating)}
-              </span>
-            </div>
-            {existingReview.comment && (
-              <p className="text-sm text-muted-foreground">
-                {existingReview.comment}
+            <StarRating rating={existingReview?.rating ?? rating} size="sm" />
+            {(existingReview?.comment || comment) && (
+              <p className="mt-2 text-sm text-muted-foreground italic">
+                "{existingReview?.comment ?? comment}"
               </p>
             )}
           </div>
@@ -379,14 +332,14 @@ function ReviewSection({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0) return;
+    if (rating === 0 || comment.length > 500) return;
     setSubmitting(true);
     setError(null);
     try {
       await reviewsApi.create({
         appointmentId,
         rating,
-        comment: comment || null,
+        comment: comment.trim() || null,
       });
       setDone(true);
     } catch (err: any) {
@@ -396,6 +349,8 @@ function ReviewSection({
       setSubmitting(false);
     }
   };
+
+  const isOverLimit = comment.length > 500;
 
   return (
     <div
@@ -418,10 +373,11 @@ function ReviewSection({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="text-sm font-medium mb-2 block">Rating</label>
-          <StarPicker
-            value={rating}
+          <StarRating
+            rating={rating}
             onChange={setRating}
             disabled={submitting}
+            size="lg"
           />
         </div>
 
@@ -436,22 +392,29 @@ function ReviewSection({
             id="review-comment"
             data-testid="review-comment-input"
             rows={3}
-            maxLength={500}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             disabled={submitting}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+            className={`w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none ${
+              isOverLimit
+                ? "border-destructive ring-destructive"
+                : "border-input"
+            }`}
             placeholder="Share your experience…"
           />
-          <p className="text-xs text-muted-foreground text-right">
-            {comment.length}/500
-          </p>
+          <div className="flex justify-end">
+            <p
+              className={`text-xs ${isOverLimit ? "text-destructive font-bold" : "text-muted-foreground"}`}
+            >
+              {comment.length}/500
+            </p>
+          </div>
         </div>
 
         <button
           type="submit"
           data-testid="review-submit"
-          disabled={submitting || rating === 0}
+          disabled={submitting || rating === 0 || isOverLimit}
           className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {submitting ? "Submitting…" : "Submit Review"}

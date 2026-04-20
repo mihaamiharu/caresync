@@ -9,6 +9,7 @@ import { doctorsApi, schedulesApi, reviewsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Doctor, DoctorSchedule, DoctorReview } from "@caresync/shared";
 import { ArrowLeft, Mail, Phone, Award, Building2, Star } from "lucide-react";
+import { StarRating } from "@/components/ui/StarRating";
 
 // ─── Loader ────────────────────────────────────────────────────────────────────
 
@@ -413,12 +414,7 @@ function ReviewsSection({
                     {review.patientLastName?.charAt(0)}.
                   </span>
                   <div className="flex items-center gap-1">
-                    <span className="text-yellow-400 text-sm">
-                      {"★".repeat(review.rating)}
-                    </span>
-                    <span className="text-gray-300 text-sm">
-                      {"☆".repeat(5 - review.rating)}
-                    </span>
+                    <StarRating rating={review.rating} size="sm" />
                   </div>
                 </div>
                 {review.comment && (
@@ -525,12 +521,11 @@ export function DoctorProfilePage() {
               <p className="text-primary font-medium">
                 {doctor.specialization}
               </p>
-              <div className="mt-2 flex items-center gap-1 text-yellow-500">
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4" />
+              <div className="mt-2 flex items-center gap-1">
+                <StarRating
+                  rating={Math.round(doctor.averageRating ?? 0)}
+                  size="sm"
+                />
                 <span className="ml-1 text-sm text-muted-foreground">
                   (
                   {doctor.averageRating != null
