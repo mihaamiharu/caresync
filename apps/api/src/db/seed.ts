@@ -16,11 +16,26 @@ import {
   medicalRecords,
   prescriptions,
   prescriptionItems,
+  reviews,
 } from "./schema";
 import bcrypt from "bcryptjs";
 
 async function seed() {
   console.log("🌱 Seeding database...");
+
+  // --- Cleanup ---
+  console.log("  🧹 Cleaning up existing data...");
+  await db.delete(prescriptionItems);
+  await db.delete(prescriptions);
+  await db.delete(reviews);
+  await db.delete(medicalRecords);
+  await db.delete(appointments);
+  await db.delete(doctorSchedules);
+  await db.delete(patients);
+  await db.delete(doctors);
+  await db.delete(departments);
+  await db.delete(users);
+  console.log("  ✓ Cleanup complete");
 
   // --- Users ---
   const passwordHash = await bcrypt.hash("Password123!", 10);
@@ -577,6 +592,79 @@ async function seed() {
   console.log(
     "  ✓ Prescriptions created (8 total across 2 doctors + 2 patients)"
   );
+
+  // --- Reviews (Seeding 15 reviews for Dr. Smith to test pagination/avg) ---
+  console.log("  🌱 Seeding reviews for Dr. Smith...");
+  const reviewsToCreate = [];
+  const reviewComments = [
+    "Excellent doctor, very attentive.",
+    "Great experience, highly recommended.",
+    "Very professional and knowledgeable.",
+    "Wait time was short, doctor was great.",
+    "Friendly staff and great care.",
+    "Dr. Smith is the best!",
+    "Very satisfied with the consultation.",
+    "Clear instructions and kind demeanor.",
+    "Thorough examination and great follow-up.",
+    "Helpful and patient with my questions.",
+    "A bit of a wait, but the doctor was worth it.",
+    "Standard checkup, everything went well.",
+    "Professional service as always.",
+    "Highly competent and empathetic.",
+    "Great bedside manner.",
+  ];
+
+  for (let i = 0; i < 15; i++) {
+    // Create a unique user and patient for each review
+    const [reviewUser] = await db
+      .insert(users)
+      .values({
+        email: `patient.rev${i}@caresync.dev`,
+        passwordHash,
+        role: "patient",
+        firstName: `Reviewer${i}`,
+        lastName: "Patient",
+        phone: `+1-555-900-${i.toString().padStart(4, "0")}`,
+        isActive: true,
+      })
+      .returning();
+
+    const [reviewPatient] = await db
+      .insert(patients)
+      .values({
+        userId: reviewUser.id,
+        dateOfBirth: "1985-01-01",
+        gender: i % 2 === 0 ? "male" : "female",
+      })
+      .returning();
+
+    // Create a completed appointment for each
+    const [reviewAppt] = await db
+      .insert(appointments)
+      .values({
+        patientId: reviewPatient.id,
+        doctorId: doctor.id,
+        appointmentDate: `2026-03-${(i % 28) + 1}`, // Spread across March
+        startTime: `${((i % 8) + 9).toString().padStart(2, "0")}:00`, // Unique times
+        endTime: `${((i % 8) + 9).toString().padStart(2, "0")}:30`,
+        status: "completed",
+        type: "consultation",
+        reason: "Routine review seeding",
+      })
+      .returning();
+
+    reviewsToCreate.push({
+      appointmentId: reviewAppt.id,
+      patientId: reviewPatient.id,
+      doctorId: doctor.id,
+      rating: (i % 3) + 3, // Ratings 3, 4, 5
+      comment: reviewComments[i],
+    });
+  }
+
+  await db.insert(reviews).values(reviewsToCreate);
+
+  console.log("  ✓ 15 reviews created for Dr. Smith");
   console.log("");
   console.log("✅ Seed complete!");
   console.log("");
