@@ -13,10 +13,15 @@ import type {
   MedicalRecord,
   MedicalRecordAttachment,
   Invoice,
+  Prescription,
+  Review,
+  DoctorReview,
+  PaginatedDoctorReviewsResponse,
   PrescriptionResponse,
   CreatePrescriptionInput,
   UpdatePrescriptionInput,
-  Notification as AppNotification,
+  PrescriptionItem,
+  Notification,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -400,6 +405,12 @@ export interface CreateMedicalRecordInput {
   notes?: string | null;
 }
 
+export interface MedicalRecordDetail extends MedicalRecord {
+  patient: Patient;
+  appointment: Appointment;
+  attachments: MedicalRecordAttachment[];
+}
+
 export interface ListMedicalRecordsParams {
   patientId?: string;
   appointmentId?: string;
@@ -414,8 +425,8 @@ export const medicalRecordsApi = {
     return res.data;
   },
 
-  get: async (id: string): Promise<MedicalRecord> => {
-    const res = await apiClient.get<MedicalRecord>(
+  get: async (id: string): Promise<MedicalRecordDetail> => {
+    const res = await apiClient.get<MedicalRecordDetail>(
       `/api/v1/medical-records/${id}`
     );
     return res.data;
@@ -437,6 +448,42 @@ export const medicalRecordsApi = {
       `/api/v1/medical-records/${recordId}/attachments`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    return res.data;
+  },
+};
+
+// ─── Reviews API ─────────────────────────────────────────────────────────────
+
+export interface CreateReviewInput {
+  appointmentId: string;
+  rating: number;
+  comment?: string | null;
+}
+
+export const reviewsApi = {
+  /** POST /api/v1/reviews */
+  create: async (data: CreateReviewInput): Promise<Review> => {
+    const res = await apiClient.post<Review>("/api/v1/reviews", data);
+    return res.data;
+  },
+
+  /** GET /api/v1/reviews/appointment/:appointmentId */
+  getByAppointment: async (appointmentId: string): Promise<Review> => {
+    const res = await apiClient.get<Review>(
+      `/api/v1/reviews/appointment/${appointmentId}`
+    );
+    return res.data;
+  },
+
+  /** GET /api/v1/doctors/:id/reviews */
+  getByDoctor: async (
+    doctorId: string,
+    params?: { page?: number; limit?: number }
+  ): Promise<PaginatedDoctorReviewsResponse> => {
+    const res = await apiClient.get<PaginatedDoctorReviewsResponse>(
+      `/api/v1/doctors/${doctorId}/reviews`,
+      { params }
     );
     return res.data;
   },
@@ -532,8 +579,8 @@ interface ListNotificationsParams {
 export const notificationsApi = {
   list: async (
     params?: ListNotificationsParams
-  ): Promise<PaginatedResponse<AppNotification>> => {
-    const res = await apiClient.get<PaginatedResponse<AppNotification>>(
+  ): Promise<PaginatedResponse<Notification>> => {
+    const res = await apiClient.get<PaginatedResponse<Notification>>(
       "/api/v1/notifications",
       { params }
     );
@@ -547,8 +594,8 @@ export const notificationsApi = {
     return res.data;
   },
 
-  markAsRead: async (id: string): Promise<AppNotification> => {
-    const res = await apiClient.patch<AppNotification>(
+  markAsRead: async (id: string): Promise<Notification> => {
+    const res = await apiClient.patch<Notification>(
       `/api/v1/notifications/${id}/read`
     );
     return res.data;

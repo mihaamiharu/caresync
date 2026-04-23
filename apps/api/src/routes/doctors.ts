@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, ilike, or, sql, and, asc, inArray } from "drizzle-orm";
+import { eq, ilike, or, sql, and, asc, inArray, count } from "drizzle-orm";
 import { db } from "../db";
 import {
   users,
@@ -8,6 +8,7 @@ import {
   appointments,
   medicalRecords,
   doctorSchedules,
+  reviews,
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { hashPassword } from "../lib/password";
@@ -42,6 +43,8 @@ const doctorResponse = z.object({
   licenseNumber: z.string(),
   user: userResponse.optional(),
   department: departmentResponse.optional(),
+  averageRating: z.number().nullable().optional(),
+  reviewCount: z.number().nullable().optional(),
 });
 
 const errorResponse = z.object({ message: z.string() });
@@ -225,7 +228,22 @@ doctorsRoute.openapi(getDoctorRoute, async (c) => {
     return c.json({ message: "Doctor not found" }, 404);
   }
 
-  return c.json(doctor, 200);
+  const [stats] = await db
+    .select({
+      averageRating: sql<number | null>`avg(rating)::float`,
+      reviewCount: count(reviews.id),
+    })
+    .from(reviews)
+    .where(eq(reviews.doctorId, id));
+
+  return c.json(
+    {
+      ...doctor,
+      averageRating: stats?.averageRating ?? null,
+      reviewCount: Number(stats?.reviewCount ?? 0),
+    },
+    200
+  );
 });
 
 // ─── POST /doctors (admin) ───────────────────────────────────────────────────

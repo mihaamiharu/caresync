@@ -8,7 +8,6 @@ import {
   appointments,
   patients,
   doctors,
-  users,
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import type { AppEnv } from "../app";

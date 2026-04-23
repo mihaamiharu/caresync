@@ -1,0 +1,28 @@
+
+/home/mihaamiharu/caresync/apps/api/src/routes/appointments.ts
+  274:19  error  '_ph1' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  275:16  error  '_pc' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  276:16  error  '_pu' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  280:19  error  '_ph2' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  281:16  error  '_dc' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  282:16  error  '_du' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  499:19  error  '_ph1' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  500:16  error  '_pc' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  501:16  error  '_pu' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  505:19  error  '_ph2' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  506:16  error  '_dc' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  507:16  error  '_du' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/home/mihaamiharu/caresync/apps/api/src/routes/doctors.ts
+    2:49  error  'avg' is defined but never used                                             @typescript-eslint/no-unused-vars
+   12:3   error  'patients' is defined but never used                                        @typescript-eslint/no-unused-vars
+  244:20  error  Unexpected constant nullishness on the left-hand side of a `??` expression  no-constant-binary-expression
+
+/home/mihaamiharu/caresync/apps/api/src/routes/invoices.ts
+  2:24  error  'or' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/mihaamiharu/caresync/apps/api/src/routes/prescriptions.ts
+  11:3  error  'users' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 17 problems (17 errors, 0 warnings)
+

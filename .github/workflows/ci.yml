@@ -68,3 +68,41 @@ jobs:
 
       - name: Build all packages
         run: pnpm build
+
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build]
+    # Only deploy on pushes to main, not on PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://app.testingwithekki.com
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync source to VPS
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='apps/*/node_modules' \
+            --exclude='apps/web/dist' \
+            --exclude='apps/e2e' \
+            --exclude='.env*' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            ./ \
+            ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_DIR }}/
+
+      - name: Build and restart containers on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "cd ${{ vars.DEPLOY_DIR }} && \
+             docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build"

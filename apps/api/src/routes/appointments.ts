@@ -271,15 +271,15 @@ appointmentsRoute.openapi(getAppointmentRoute, async (c) => {
   }
 
   const {
-    passwordHash: _ph1,
-    createdAt: _pc,
-    updatedAt: _pu,
+    passwordHash: _1,
+    createdAt: _2,
+    updatedAt: _3,
     ...patientUserSafe
   } = row.patientUser;
   const {
-    passwordHash: _ph2,
-    createdAt: _dc,
-    updatedAt: _du,
+    passwordHash: _4,
+    createdAt: _5,
+    updatedAt: _6,
     ...doctorUserSafe
   } = row.doctorUser;
 
@@ -449,22 +449,27 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
       const amount = feeMap[row.appointment.type] ?? "100000.00";
       const taxRate = 0.11; // 11% PPN
       const taxAmount = (parseFloat(amount) * taxRate).toFixed(2);
-      const totalAmount = (parseFloat(amount) + parseFloat(taxAmount)).toFixed(2);
+      const totalAmount = (parseFloat(amount) + parseFloat(taxAmount)).toFixed(
+        2
+      );
 
       // Due date: 7 days from now
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7);
       const dueDateStr = dueDate.toISOString().substring(0, 10);
 
-      const [newInvoice] = await db.insert(invoices).values({
-        appointmentId: id,
-        patientId: row.appointment.patientId,
-        amount,
-        tax: taxAmount,
-        total: totalAmount,
-        status: "pending",
-        dueDate: dueDateStr,
-      }).returning();
+      const [newInvoice] = await db
+        .insert(invoices)
+        .values({
+          appointmentId: id,
+          patientId: row.appointment.patientId,
+          amount,
+          tax: taxAmount,
+          total: totalAmount,
+          status: "pending",
+          dueDate: dueDateStr,
+        })
+        .returning();
 
       await db.insert(notifications).values({
         userId: row.patient.userId,
@@ -496,15 +501,15 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
   const updated = updatedRows[0]!;
 
   const {
-    passwordHash: _ph1,
-    createdAt: _pc,
-    updatedAt: _pu,
+    passwordHash: _1,
+    createdAt: _2,
+    updatedAt: _3,
     ...patientUserSafe
   } = updated.patientUser;
   const {
-    passwordHash: _ph2,
-    createdAt: _dc,
-    updatedAt: _du,
+    passwordHash: _4,
+    createdAt: _5,
+    updatedAt: _6,
     ...doctorUserSafe
   } = updated.doctorUser;
 
@@ -726,6 +731,15 @@ appointmentsRoute.openapi(createAppointmentRoute, async (c) => {
         notes: notes ?? null,
       })
       .returning();
+
+    // Create notification for new appointment
+    await db.insert(notifications).values({
+      userId,
+      title: "New Appointment Booked",
+      message: `Your appointment on ${appointmentDate} has been scheduled.`,
+      type: "appointment",
+      link: `/patient/appointments/${appointment.id}`,
+    });
 
     return c.json(appointment, 201);
   } catch (error) {

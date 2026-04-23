@@ -12,6 +12,7 @@ import { patientsRoute } from "./routes/patients";
 import { appointmentsRoute } from "./routes/appointments";
 import { medicalRecordsRoute } from "./routes/medical-records";
 import { invoicesRoute } from "./routes/invoices";
+import { reviewsRoute } from "./routes/reviews";
 import { prescriptionsRoute } from "./routes/prescriptions";
 import { notificationsRoute } from "./routes/notifications";
 
@@ -52,6 +53,7 @@ app.route("/api/v1", patientsRoute);
 app.route("/api/v1", appointmentsRoute);
 app.route("/api/v1", medicalRecordsRoute);
 app.route("/api/v1", invoicesRoute);
+app.route("/api/v1", reviewsRoute);
 app.route("/api/v1", prescriptionsRoute);
 app.route("/api/v1", notificationsRoute);
 

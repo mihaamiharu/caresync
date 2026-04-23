@@ -1,7 +1,13 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, and, sql, or } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "../db";
-import { invoices, patients, users, appointments, notifications } from "../db/schema";
+import {
+  invoices,
+  patients,
+  users,
+  appointments,
+  notifications,
+} from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import type { AppEnv } from "../app";
 

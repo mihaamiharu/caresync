@@ -66,7 +66,7 @@ const baseInvoice = {
   tax: 10.0,
   total: 110.0,
   status: "pending" as InvoiceStatus,
-  dueDate: "2026-04-20",
+  dueDate: "2099-12-31",
   paidAt: null,
 };
 
