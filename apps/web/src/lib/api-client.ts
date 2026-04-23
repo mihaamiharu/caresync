@@ -16,8 +16,22 @@ import type {
   PrescriptionResponse,
   CreatePrescriptionInput,
   UpdatePrescriptionInput,
+  Notification as AppNotification,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
+
+export interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+      errors?: Record<string, { _errors?: string[] } | string>;
+      error?: {
+        issues?: Array<{ path: string[]; message: string }>;
+      };
+    };
+  };
+}
 
 export const apiClient = axios.create({
   baseURL: "/",
@@ -184,7 +198,7 @@ export const departmentsApi = {
   },
 };
 
-interface CreateDoctorInput {
+export interface CreateDoctorInput {
   email: string;
   password?: string;
   firstName: string;
@@ -503,6 +517,46 @@ export const prescriptionsApi = {
     const res = await apiClient.put<PrescriptionResponse>(
       `/api/v1/prescriptions/${id}`,
       data
+    );
+    return res.data;
+  },
+};
+
+// ─── Notifications API ────────────────────────────────────────────────────────
+
+interface ListNotificationsParams {
+  page?: number;
+  limit?: number;
+}
+
+export const notificationsApi = {
+  list: async (
+    params?: ListNotificationsParams
+  ): Promise<PaginatedResponse<AppNotification>> => {
+    const res = await apiClient.get<PaginatedResponse<AppNotification>>(
+      "/api/v1/notifications",
+      { params }
+    );
+    return res.data;
+  },
+
+  getUnreadCount: async (): Promise<{ count: number }> => {
+    const res = await apiClient.get<{ count: number }>(
+      "/api/v1/notifications/unread-count"
+    );
+    return res.data;
+  },
+
+  markAsRead: async (id: string): Promise<AppNotification> => {
+    const res = await apiClient.patch<AppNotification>(
+      `/api/v1/notifications/${id}/read`
+    );
+    return res.data;
+  },
+
+  markAllAsRead: async (): Promise<{ success: boolean }> => {
+    const res = await apiClient.patch<{ success: boolean }>(
+      "/api/v1/notifications/read-all"
     );
     return res.data;
   },

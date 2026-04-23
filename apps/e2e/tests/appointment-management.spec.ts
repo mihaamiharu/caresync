@@ -455,4 +455,56 @@ test.describe("Appointment Management — UI", () => {
     // Cancel button should be gone (terminal state)
     await expect(page.getByTestId("appointment-actions")).not.toBeVisible();
   });
+
+  test("AM-5: Doctor completes appointment and triggers invoice and notification generation", async ({
+    page,
+    request,
+    loginPage,
+    cleanup,
+  }) => {
+    test.skip(!config.adminEmail, "Set ADMIN_EMAIL + ADMIN_PASSWORD env vars");
+
+    const adminToken = await getAdminToken(request);
+    const { doctor, doctorToken } = await createDeptDoctorWithSchedule(
+      request,
+      adminToken,
+      cleanup
+    );
+    const { credentials, accessToken: patientToken } = await registerPatient(
+      request,
+      cleanup
+    );
+
+    // 1. Patient books appointment
+    const appt = await bookAppointment(request, patientToken, doctor.id);
+
+    // 2. Doctor transitions appointment to completed
+    await request.patch(`${config.apiUrl}/api/v1/appointments/${appt.id}/status`, {
+      data: { status: "confirmed" },
+      headers: { Authorization: `Bearer ${doctorToken}` },
+    });
+    await request.patch(`${config.apiUrl}/api/v1/appointments/${appt.id}/status`, {
+      data: { status: "in-progress" },
+      headers: { Authorization: `Bearer ${doctorToken}` },
+    });
+    await request.patch(`${config.apiUrl}/api/v1/appointments/${appt.id}/status`, {
+      data: { status: "completed" },
+      headers: { Authorization: `Bearer ${doctorToken}` },
+    });
+
+    // 3. Log in as patient
+    await loginPage.goto();
+    await loginPage.login(credentials.email, credentials.password);
+    await page.waitForURL("/dashboard");
+
+    // 4. Check notifications
+    await page.goto("/notifications");
+    await expect(page.getByTestId("notifications-page")).toBeVisible();
+    await expect(page.getByText("Your appointment status was updated to completed.")).toBeVisible();
+
+    // 5. Check invoices
+    await page.goto("/invoices");
+    // The invoice list should show the newly generated invoice
+    await expect(page.getByText(/INV-/)).toBeVisible();
+  });
 });

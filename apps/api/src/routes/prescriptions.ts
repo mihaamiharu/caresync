@@ -217,7 +217,7 @@ prescriptionsRoute.openapi(listPrescriptionsRoute, async (c) => {
 
   // Fetch items for all prescriptions in one query
   const prescriptionIds = rows.map((r) => r.id);
-  let itemsMap: Record<
+  const itemsMap: Record<
     string,
     {
       id: string;

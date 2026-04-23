@@ -43,6 +43,10 @@ import {
   PrescriptionDetailPage,
   prescriptionDetailLoader,
 } from "@/pages/prescriptions/detail";
+import {
+  NotificationsPage,
+  notificationsLoader,
+} from "@/pages/notifications";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -144,6 +148,11 @@ export const router = createBrowserRouter([
             path: "/prescriptions/:id",
             loader: prescriptionDetailLoader,
             element: <PrescriptionDetailPage />,
+          },
+          {
+            path: "/notifications",
+            loader: notificationsLoader,
+            element: <NotificationsPage />,
           },
         ],
       },

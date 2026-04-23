@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { doctorsApi, departmentsApi } from "@/lib/api-client";
+import { doctorsApi, departmentsApi, type CreateDoctorInput, type ApiError } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Doctor, Department } from "@caresync/shared";
 
@@ -111,22 +111,12 @@ function DoctorFormModal({
           licenseNumber: data.licenseNumber,
           phone: data.phone || null,
           bio: data.bio || null,
-        } as any);
+        } as CreateDoctorInput);
       }
       onSaved();
       onClose();
-    } catch (err: unknown) {
-      const axiosError = err as {
-        response?: {
-          data?: {
-            message?: string;
-            errors?: any;
-            error?: {
-              issues?: Array<{ path: string[]; message: string }>;
-            };
-          };
-        };
-      };
+    } catch (err) {
+      const axiosError = err as ApiError;
       const data = axiosError.response?.data;
       if (data?.message) {
         setServerError(data.message);
@@ -140,8 +130,8 @@ function DoctorFormModal({
         // Flatten other potential error structures
         const errorMsgs = Object.entries(data.errors)
           .map(
-            ([field, error]: [string, any]) =>
-              `${field}: ${error._errors?.join(", ") || error}`
+            ([field, error]) =>
+              `${field}: ${typeof error === 'string' ? error : error._errors?.join(", ") || "Invalid field"}`
           )
           .join(" | ");
         setServerError(errorMsgs || "Validation failed");

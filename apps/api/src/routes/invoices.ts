@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, and, sql, ilike, or } from "drizzle-orm";
+import { eq, and, sql, or } from "drizzle-orm";
 import { db } from "../db";
-import { invoices, patients, users, appointments } from "../db/schema";
+import { invoices, patients, users, appointments, notifications } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import type { AppEnv } from "../app";
 
@@ -25,31 +25,6 @@ const invoiceResponse = z.object({
 const errorResponse = z.object({ message: z.string() });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-async function getInvoiceWithPatient(
-  invoiceId: string,
-  userId: string,
-  role: string
-) {
-  const [invoice] = await db
-    .select()
-    .from(invoices)
-    .where(eq(invoices.id, invoiceId))
-    .limit(1);
-  return invoice;
-}
-
-function canAccessInvoice(invoice: any, userId: string, role: string): boolean {
-  if (role === "admin") return true;
-  if (role === "patient")
-    return invoice.patientId === getPatientIdFromUserId(userId);
-  return false;
-}
-
-function getPatientIdFromUserId(userId: string): string | null {
-  // This will be resolved via the query
-  return null;
-}
 
 // ─── POST /invoices ───────────────────────────────────────────────────────────
 
@@ -157,6 +132,22 @@ invoicesRoute.openapi(createInvoiceRoute, async (c) => {
       dueDate: dueDate.toISOString().substring(0, 10),
     })
     .returning();
+
+  const [patientUserRow] = await db
+    .select({ userId: patients.userId })
+    .from(patients)
+    .where(eq(patients.id, patientId))
+    .limit(1);
+
+  if (patientUserRow) {
+    await db.insert(notifications).values({
+      userId: patientUserRow.userId,
+      title: "New Invoice Generated",
+      message: `An invoice of Rp ${total} has been generated for your appointment.`,
+      type: "invoice",
+      link: `/patient/invoices/${inserted.id}`,
+    });
+  }
 
   return c.json(inserted, 201);
 });
@@ -281,7 +272,7 @@ invoicesRoute.openapi(listInvoicesRoute, async (c) => {
     .select({ total: sql<number>`count(*)::int` })
     .from(invoices);
 
-  let rows: any[];
+  let rows: Awaited<typeof baseQuery>;
   let total: number;
 
   if (whereCondition) {

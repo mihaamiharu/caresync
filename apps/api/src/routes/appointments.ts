@@ -10,6 +10,7 @@ import {
   doctorSchedules,
   users,
   invoices,
+  notifications,
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { computeAvailableSlots } from "../lib/schedule-service";
@@ -421,6 +422,15 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
     .where(eq(appointments.id, id))
     .returning();
 
+  // Create notification for appointment status change
+  await db.insert(notifications).values({
+    userId: row.patient.userId,
+    title: "Appointment Status Updated",
+    message: `Your appointment with Dr. ${row.doctorUser.lastName} is now ${newStatus}.`,
+    type: "appointment",
+    link: `/patient/appointments/${id}`,
+  });
+
   // 5b. Auto-generate invoice when appointment is completed
   if (newStatus === "completed") {
     const [existingInvoice] = await db
@@ -446,7 +456,7 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
       dueDate.setDate(dueDate.getDate() + 7);
       const dueDateStr = dueDate.toISOString().substring(0, 10);
 
-      await db.insert(invoices).values({
+      const [newInvoice] = await db.insert(invoices).values({
         appointmentId: id,
         patientId: row.appointment.patientId,
         amount,
@@ -454,6 +464,14 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
         total: totalAmount,
         status: "pending",
         dueDate: dueDateStr,
+      }).returning();
+
+      await db.insert(notifications).values({
+        userId: row.patient.userId,
+        title: "New Invoice Generated",
+        message: `An invoice of Rp ${totalAmount} has been generated for your appointment.`,
+        type: "invoice",
+        link: `/patient/invoices/${newInvoice.id}`,
       });
     }
   }
@@ -710,7 +728,7 @@ appointmentsRoute.openapi(createAppointmentRoute, async (c) => {
       .returning();
 
     return c.json(appointment, 201);
-  } catch (error: any) {
+  } catch (error) {
     if (error?.code === "23505") {
       return c.json(
         { message: "This slot was just booked — please select another" },

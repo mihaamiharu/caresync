@@ -69,7 +69,7 @@ function MedicalInfoForm({ patient }: { patient: Patient | null }) {
         emergencyContactPhone: data.emergencyContactPhone || null,
       });
       setSuccess(true);
-    } catch (err: unknown) {
+    } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
       setServerError(msg ?? "Something went wrong. Please try again.");
@@ -254,7 +254,7 @@ export function ProfilePage() {
         setAuth(updated, accessToken);
       }
       setSuccess(true);
-    } catch (err: unknown) {
+    } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
       setServerError(msg ?? "Something went wrong. Please try again.");
@@ -272,7 +272,7 @@ export function ProfilePage() {
       if (updated && accessToken) {
         setAuth(updated, accessToken);
       }
-    } catch (err: unknown) {
+    } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
       setAvatarError(msg ?? "Failed to upload avatar.");

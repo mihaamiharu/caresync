@@ -136,7 +136,7 @@ function MedicalRecordSection({
         notes: notes || null,
       });
       setRecord(created);
-    } catch (err: any) {
+    } catch (err) {
       const msg =
         err?.response?.data?.message ?? "Failed to create medical record.";
       setError(msg);
@@ -289,7 +289,7 @@ export function AppointmentDetailPage() {
     try {
       const res = await appointmentsApi.updateStatus(id, targetStatus);
       setAppointment(res.appointment);
-    } catch (err: any) {
+    } catch (err) {
       const msg =
         err?.response?.data?.message ?? "Failed to update appointment status.";
       setActionError(msg);
@@ -301,8 +301,8 @@ export function AppointmentDetailPage() {
   const status = appointment.status as AppointmentStatus;
   const actions = getActions(user?.role, status);
 
-  const patient = appointment.patient as any;
-  const doctor = appointment.doctor as any;
+  const patient = appointment.patient as never;
+  const doctor = appointment.doctor as never;
 
   return (
     <div data-testid="appointment-detail-page">

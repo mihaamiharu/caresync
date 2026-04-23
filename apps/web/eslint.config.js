@@ -16,9 +16,26 @@ export default tseslint.config(
             "useEffect is banned. Use React Router loaders, event handlers, or derived state instead.",
         },
       ],
-      // Pre-existing issues — not in scope for this enforcement pass
-      "@typescript-eslint/no-explicit-any": "off",
+      // Block usage of 'any'
+      "@typescript-eslint/no-explicit-any": "error",
+      // Ban usage of 'unknown' type
+      "@typescript-eslint/no-restricted-types": [
+        "error",
+        {
+          types: {
+            unknown: {
+              message: "Use a proper type instead of 'unknown'.",
+            },
+          },
+        },
+      ],
       "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
     },
   }
 );
