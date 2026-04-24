@@ -6,9 +6,23 @@ import { loginSchema, type LoginInput } from "@caresync/shared";
 import { authApi, type ApiError } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
+function getRoleDashboard(role: string): string {
+  switch (role) {
+    case "admin":
+      return "/admin";
+    case "doctor":
+      return "/doctor";
+    case "patient":
+      return "/dashboard";
+    default:
+      return "/dashboard";
+  }
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -20,8 +34,8 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated && user) {
+    return <Navigate to={getRoleDashboard(user.role)} replace />;
   }
 
   const onSubmit = async (data: LoginInput) => {
@@ -29,7 +43,7 @@ export function LoginPage() {
     try {
       const { accessToken, user } = await authApi.login(data);
       setAuth(user, accessToken);
-      navigate("/dashboard", { replace: true });
+      navigate(getRoleDashboard(user.role), { replace: true });
     } catch (err) {
       const axiosError = err as ApiError;
       setServerError(axiosError.response?.data?.message ?? "Something went wrong. Please try again.");

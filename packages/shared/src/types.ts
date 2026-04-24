@@ -41,6 +41,14 @@ export interface Doctor {
   reviewCount: number;
 }
 
+export interface DoctorMeStats extends Doctor {
+  stats: {
+    totalAppointments: number;
+    uniquePatients: number;
+    todayAppointments: number;
+  };
+}
+
 export interface DoctorSchedule {
   id: string;
   doctorId: string;

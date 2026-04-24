@@ -13,7 +13,8 @@ import type {
   MedicalRecord,
   MedicalRecordAttachment,
   Invoice,
-  Prescription,  Review,
+  Prescription,
+  Review,
   DoctorReview,
   PaginatedDoctorReviewsResponse,
   PrescriptionResponse,
@@ -22,6 +23,7 @@ import type {
   PrescriptionItem,
   Notification,
   AdminStatsResponse,
+  DoctorMeStatsResponse,
 } from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -244,6 +246,11 @@ export const doctorsApi = {
 
   getDoctor: async (id: string): Promise<Doctor> => {
     const res = await apiClient.get<Doctor>(`/api/v1/doctors/${id}`);
+    return res.data;
+  },
+
+  getDoctorMe: async (): Promise<DoctorMeStatsResponse> => {
+    const res = await apiClient.get<DoctorMeStatsResponse>("/api/v1/doctors/me");
     return res.data;
   },
 
