@@ -270,8 +270,7 @@ function PrescriptionModal({
       reset();
       onOpenChange(false);
       onSuccess();
-    } catch (err) {
-      const msg =
+    } catch (err) {      const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ?? "Failed to create prescription";
       toast.error(msg);

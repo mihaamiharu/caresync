@@ -239,14 +239,11 @@ doctorsRoute.openapi(getDoctorRoute, async (c) => {
   return c.json(
     {
       ...doctor,
-      averageRating: stats?.averageRating ?? null,
       reviewCount: Number(stats?.reviewCount ?? 0),
     },
     200
   );
 });
-
-// ─── POST /doctors (admin) ───────────────────────────────────────────────────
 
 const createDoctorBody = z.object({
   email: z.string().email(),

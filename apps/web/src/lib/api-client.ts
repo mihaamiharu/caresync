@@ -13,16 +13,14 @@ import type {
   MedicalRecord,
   MedicalRecordAttachment,
   Invoice,
-  Prescription,
-  Review,
+  Prescription,  Review,
   DoctorReview,
   PaginatedDoctorReviewsResponse,
   PrescriptionResponse,
   CreatePrescriptionInput,
   UpdatePrescriptionInput,
   PrescriptionItem,
-  Notification,
-} from "@caresync/shared";
+  Notification,} from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
 export interface ApiError {

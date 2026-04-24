@@ -5,7 +5,6 @@ import {
   appointmentsApi,
   medicalRecordsApi,
   reviewsApi,
-  type ApiError,
 } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type {
@@ -15,8 +14,7 @@ import type {
   Review,
   User,
   Patient,
-  Doctor,
-} from "@caresync/shared";
+  Doctor,} from "@caresync/shared";
 import { StatusBadge } from "./components/StatusBadge";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -350,8 +348,7 @@ function ReviewSection({
     } catch (err) {
       const msg =
         (err as ApiError)?.response?.data?.message ??
-        "Failed to submit review.";
-      setError(msg);
+        "Failed to submit review.";      setError(msg);
     } finally {
       setSubmitting(false);
     }
