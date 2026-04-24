@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   useParams,
   useNavigate,
   useLoaderData,
   useNavigation,
 } from "react-router";
-import { doctorsApi, schedulesApi } from "@/lib/api-client";
+import { doctorsApi, schedulesApi, reviewsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Doctor, DoctorSchedule } from "@caresync/shared";
+import type { Doctor, DoctorSchedule, DoctorReview } from "@caresync/shared";
 import { ArrowLeft, Mail, Phone, Award, Building2, Star } from "lucide-react";
+import { StarRating } from "@/components/ui/StarRating";
 
 // ─── Loader ────────────────────────────────────────────────────────────────────
 
@@ -319,6 +320,152 @@ function DoctorAvailabilityViewer({ doctorId }: { doctorId: string }) {
   );
 }
 
+// ─── Reviews Section ─────────────────────────────────────────────────────────
+
+interface ReviewsSectionProps {
+  doctorId: string;
+  initialAverageRating: number | null;
+  initialReviewCount: number;
+}
+
+function ReviewsSection({
+  doctorId,
+  initialAverageRating,
+  initialReviewCount,
+}: ReviewsSectionProps) {
+  const [reviews, setReviews] = useState<DoctorReview[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const limit = 5;
+
+  const loadReviews = (pageNum: number) => {
+    setLoading(true);
+    reviewsApi
+      .getByDoctor(doctorId, { page: pageNum, limit })
+      .then((res) => {
+        setReviews(res.data);
+        setTotalPages(res.totalPages);
+        setPage(res.page);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useSyncExternalStore(
+    () => () => {},
+    () => "ready",
+    () => "ready"
+  );
+
+  if (initialReviewCount === 0 && reviews.length === 0) {
+    return (
+      <div
+        className="rounded-lg border border-border bg-card p-6"
+        data-testid="reviews-section"
+      >
+        <h2 className="mb-4 text-base font-semibold text-foreground">
+          Patient Reviews
+        </h2>
+        <p className="text-sm text-muted-foreground py-4">No reviews yet.</p>
+      </div>
+    );
+  }
+
+  const avgRating = initialAverageRating ?? 0;
+
+  return (
+    <div
+      className="rounded-lg border border-border bg-card p-6"
+      data-testid="reviews-section"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-foreground">
+          Patient Reviews
+        </h2>
+        {initialReviewCount > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-yellow-400 text-lg">★</span>
+            <span className="font-medium text-sm">
+              {avgRating > 0 ? avgRating.toFixed(1) : "N/A"}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              ({initialReviewCount})
+            </span>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground py-4">Loading reviews…</p>
+      ) : reviews.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4">No reviews yet.</p>
+      ) : (
+        <>
+          <div className="space-y-4">
+            {reviews.map((review) => (
+              <div
+                key={review.id}
+                className="border-b border-border pb-3 last:border-0 last:pb-0"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium">
+                    {review.patientFirstName}{" "}
+                    {review.patientLastName?.charAt(0)}.
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <StarRating rating={review.rating} size="sm" />
+                  </div>
+                </div>
+                {review.comment && (
+                  <p className="text-sm text-muted-foreground">
+                    {review.comment}
+                  </p>
+                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <button
+                data-testid="reviews-prev"
+                disabled={page <= 1 || loading}
+                onClick={() => {
+                  const p = page - 1;
+                  setPage(p);
+                  loadReviews(p);
+                }}
+                className="px-3 py-1 text-sm rounded-md border border-border hover:bg-muted disabled:opacity-50"
+              >
+                ← Prev
+              </button>
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                data-testid="reviews-next"
+                disabled={page >= totalPages || loading}
+                onClick={() => {
+                  const p = page + 1;
+                  setPage(p);
+                  loadReviews(p);
+                }}
+                className="px-3 py-1 text-sm rounded-md border border-border hover:bg-muted disabled:opacity-50"
+              >
+                Next →
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Doctor profile page ──────────────────────────────────────────────────────
 
 export function DoctorProfilePage() {
@@ -374,14 +521,17 @@ export function DoctorProfilePage() {
               <p className="text-primary font-medium">
                 {doctor.specialization}
               </p>
-              <div className="mt-2 flex items-center gap-1 text-yellow-500">
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4 fill-current" />
-                <Star className="h-4 w-4" />
+              <div className="mt-2 flex items-center gap-1">
+                <StarRating
+                  rating={Math.round(doctor.averageRating ?? 0)}
+                  size="sm"
+                />
                 <span className="ml-1 text-sm text-muted-foreground">
-                  (4.0)
+                  (
+                  {doctor.averageRating != null
+                    ? doctor.averageRating.toFixed(1)
+                    : "N/A"}
+                  )
                 </span>
               </div>
             </div>
@@ -444,6 +594,13 @@ export function DoctorProfilePage() {
             </h2>
             <DoctorAvailabilityViewer doctorId={doctor.id} />
           </div>
+
+          {/* Patient Reviews */}
+          <ReviewsSection
+            doctorId={doctor.id}
+            initialAverageRating={doctor.averageRating}
+            initialReviewCount={doctor.reviewCount}
+          />
         </div>
       </div>
     </div>
