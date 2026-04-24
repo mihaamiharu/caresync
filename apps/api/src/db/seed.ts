@@ -213,6 +213,51 @@ const doctorProfiles = [
   },
 ];
 
+// Date-of-birth → "YYYY-MM-DD" string for age in years 2026
+function ageToDob(years: number): string {
+  const birthYear = 2026 - years;
+  const month = String(Math.floor(Math.random() * 12) + 1).padStart(2, "0");
+  const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, "0");
+  return `${birthYear}-${month}-${day}`;
+}
+
+const patientProfiles = [
+  // Pediatric / young (5 patients, ages 3-17)
+  { firstName: "Emma", lastName: "Thompson", dob: ageToDob(5), gender: "female" as const, bloodType: "A+", allergies: null, ecName: "Rachel Thompson", ecPhone: "+1-555-100-0001" },
+  { firstName: "Liam", lastName: "O'Brien", dob: ageToDob(8), gender: "male" as const, bloodType: "O+", allergies: "Penicillin", ecName: "Sean O'Brien", ecPhone: "+1-555-100-0002" },
+  { firstName: "Sophia", lastName: "Rivera", dob: ageToDob(12), gender: "female" as const, bloodType: "B+", allergies: null, ecName: "Maria Rivera", ecPhone: "+1-555-100-0003" },
+  { firstName: "Noah", lastName: "Kim", dob: ageToDob(3), gender: "male" as const, bloodType: "AB+", allergies: "Peanuts", ecName: "Ji-Yeon Kim", ecPhone: "+1-555-100-0004" },
+  { firstName: "Isabella", lastName: "Fischer", dob: ageToDob(16), gender: "female" as const, bloodType: "O-", allergies: null, ecName: "Klaus Fischer", ecPhone: "+1-555-100-0005" },
+  // Young adult (8 patients, ages 18-35)
+  { firstName: "Mia", lastName: "Chen", dob: ageToDob(24), gender: "female" as const, bloodType: "A-", allergies: null, ecName: "Wei Chen", ecPhone: "+1-555-100-0006" },
+  { firstName: "Ethan", lastName: "Nakamura", dob: ageToDob(29), gender: "male" as const, bloodType: "B+", allergies: "Sulfa drugs", ecName: "Haruki Nakamura", ecPhone: "+1-555-100-0007" },
+  { firstName: "Ava", lastName: "Okafor", dob: ageToDob(22), gender: "female" as const, bloodType: "O+", allergies: null, ecName: "Chidi Okafor", ecPhone: "+1-555-100-0008" },
+  { firstName: "James", lastName: "Bergmann", dob: ageToDob(31), gender: "male" as const, bloodType: "A+", allergies: null, ecName: "Klaus Bergmann", ecPhone: "+1-555-100-0009" },
+  { firstName: "Charlotte", lastName: "Dubois", dob: ageToDob(27), gender: "female" as const, bloodType: "AB-", allergies: "Latex", ecName: "Pierre Dubois", ecPhone: "+1-555-100-0010" },
+  { firstName: "Benjamin", lastName: "Santos", dob: ageToDob(35), gender: "male" as const, bloodType: "O+", allergies: null, ecName: "Ana Santos", ecPhone: "+1-555-100-0011" },
+  { firstName: "Amelia", lastName: "Hansen", dob: ageToDob(21), gender: "female" as const, bloodType: "A+", allergies: "Ibuprofen", ecName: "Lars Hansen", ecPhone: "+1-555-100-0012" },
+  // Middle-aged (10 patients, ages 36-55)
+  { firstName: "Lucas", lastName: "Andersen", dob: ageToDob(45), gender: "male" as const, bloodType: "A-", allergies: null, ecName: "Mette Andersen", ecPhone: "+1-555-100-0013" },
+  { firstName: "Harper", lastName: "Müller", dob: ageToDob(42), gender: "female" as const, bloodType: "B+", allergies: null, ecName: "Thomas Müller", ecPhone: "+1-555-100-0014" },
+  { firstName: "Alexander", lastName: "Yamamoto", dob: ageToDob(50), gender: "male" as const, bloodType: "O+", allergies: "Codeine", ecName: "Akiko Yamamoto", ecPhone: "+1-555-100-0015" },
+  { firstName: "Evelyn", lastName: "Laurent", dob: ageToDob(38), gender: "female" as const, bloodType: "A+", allergies: null, ecName: "Jean-Pierre Laurent", ecPhone: "+1-555-100-0016" },
+  { firstName: "Daniel", lastName: "Ivanov", dob: ageToDob(53), gender: "male" as const, bloodType: "AB+", allergies: null, ecName: "Natasha Ivanova", ecPhone: "+1-555-100-0017" },
+  { firstName: "Abigail", lastName: "Nielsen", dob: ageToDob(40), gender: "female" as const, bloodType: "O-", allergies: "Aspirin", ecName: "Henrik Nielsen", ecPhone: "+1-555-100-0018" },
+  { firstName: "Matthew", lastName: "Park", dob: ageToDob(48), gender: "male" as const, bloodType: "B-", allergies: null, ecName: "Soo-Jin Park", ecPhone: "+1-555-100-0019" },
+  { firstName: "Emily", lastName: "Rossi", dob: ageToDob(44), gender: "female" as const, bloodType: "A+", allergies: null, ecName: "Marco Rossi", ecPhone: "+1-555-100-0020" },
+  { firstName: "Sebastian", lastName: "Weber", dob: ageToDob(55), gender: "male" as const, bloodType: "O+", allergies: null, ecName: "Ingrid Weber", ecPhone: "+1-555-100-0021" },
+  { firstName: "Elizabeth", lastName: "Tanaka", dob: ageToDob(39), gender: "female" as const, bloodType: "B+", allergies: "Morphine", ecName: "Kenji Tanaka", ecPhone: "+1-555-100-0022" },
+  // Senior (7 patients, ages 56-78)
+  { firstName: "David", lastName: "Johansson", dob: ageToDob(65), gender: "male" as const, bloodType: "A+", allergies: null, ecName: "Eva Johansson", ecPhone: "+1-555-100-0023" },
+  { firstName: "Scarlett", lastName: "Kowalczyk", dob: ageToDob(70), gender: "female" as const, bloodType: "O+", allergies: "Penicillin", ecName: "Piotr Kowalczyk", ecPhone: "+1-555-100-0024" },
+  { firstName: "Joseph", lastName: "Volkov", dob: ageToDob(62), gender: "male" as const, bloodType: "AB-", allergies: null, ecName: "Olga Volkova", ecPhone: "+1-555-100-0025" },
+  { firstName: "Victoria", lastName: "Papadopoulos", dob: ageToDob(58), gender: "female" as const, bloodType: "B+", allergies: null, ecName: "Nikos Papadopoulos", ecPhone: "+1-555-100-0026" },
+  { firstName: "Samuel", lastName: "Abebe", dob: ageToDob(72), gender: "male" as const, bloodType: "O-", allergies: "Sulfonamides", ecName: "Tigist Abebe", ecPhone: "+1-555-100-0027" },
+  { firstName: "Grace", lastName: "Lindqvist", dob: ageToDob(67), gender: "female" as const, bloodType: "A-", allergies: null, ecName: "Sven Lindqvist", ecPhone: "+1-555-100-0028" },
+  { firstName: "Henry", lastName: "Oduya", dob: ageToDob(78), gender: "male" as const, bloodType: "B+", allergies: null, ecName: "Funke Oduya", ecPhone: "+1-555-100-0029" },
+  { firstName: "Robert", lastName: "Fernandez", dob: ageToDob(61), gender: "male" as const, bloodType: "A+", allergies: null, ecName: "Carmen Fernandez", ecPhone: "+1-555-100-0030" },
+];
+
 // ─── Seed ─────────────────────────────────────────────────────────────────────
 
 async function seed() {
@@ -305,12 +350,49 @@ async function seed() {
   await db.insert(doctorSchedules).values(scheduleRows);
   console.log(`  ✓ ${doctorRows.length} doctors created with varied schedules`);
 
-  // Placeholder log — patients and beyond will be added in subsequent slices
+  // Patients
+  const patientEmailMap: Record<number, string> = {
+    0: "patient@caresync.dev",
+  };
+  const patientUsers = await db
+    .insert(users)
+    .values(
+      patientProfiles.map((p, i) => ({
+        email: patientEmailMap[i] ?? `patient${i > 0 ? i + 1 : ""}@caresync.dev`,
+        passwordHash,
+        role: "patient" as const,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        phone: `+1-555-1${String(i).padStart(3, "0")}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+        isActive: true,
+      }))
+    )
+    .returning();
+
+  const patientRows = await db
+    .insert(patients)
+    .values(
+      patientProfiles.map((p, i) => ({
+        userId: patientUsers[i].id,
+        dateOfBirth: p.dob,
+        gender: p.gender,
+        bloodType: p.bloodType,
+        allergies: p.allergies,
+        emergencyContactName: p.ecName,
+        emergencyContactPhone: p.ecPhone,
+      }))
+    )
+    .returning();
+
+  if (patientRows.length !== patientProfiles.length) {
+    console.warn(`  ⚠ Expected ${patientProfiles.length} patients, got ${patientRows.length}`);
+  }
+  console.log(`  ✓ ${patientRows.length} patients created`);
+
   console.log("");
-  console.log("Slice 1 complete: departments, admins, doctors, schedules seeded.");
-  console.log("");
-  console.log("Demo admin accounts (password: Password123!):");
-  adminUsers.forEach((u) => console.log(`  ${u.email}`));
+  console.log(`Slice 2 complete: ${patientRows.length} patients seeded with varied demographics.`);
+  console.log("Demo patient accounts (password: Password123!):");
+  patientUsers.forEach((u) => console.log(`  ${u.email}`));
 
   process.exit(0);
 }
