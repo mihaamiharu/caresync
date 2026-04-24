@@ -5,6 +5,19 @@ interface ProtectedRouteProps {
   allowedRoles?: string[];
 }
 
+function getRoleDashboard(role: string): string {
+  switch (role) {
+    case "admin":
+      return "/admin";
+    case "doctor":
+      return "/doctor";
+    case "patient":
+      return "/dashboard";
+    default:
+      return "/dashboard";
+  }
+}
+
 export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
   const user = useAuthStore((s) => s.user);
@@ -14,7 +27,7 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getRoleDashboard(user.role)} replace />;
   }
 
   return <Outlet />;

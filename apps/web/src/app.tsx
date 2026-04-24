@@ -4,7 +4,7 @@ import {
   LoaderFunctionArgs,
 } from "react-router";
 import { AppLayout } from "@/layouts/app-layout";
-import { DashboardPage } from "@/pages/dashboard";
+import { DashboardPage, dashboardLoader } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
 import { RegisterPage } from "@/pages/register";
 import { ProfilePage, profileLoader } from "@/pages/profile";
@@ -47,17 +47,42 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { RouteErrorPage } from "@/components/route-error-page";
 import { useAuthStore } from "@/stores/auth-store";
 import { AdminDashboardPage, adminLoader } from "@/pages/admin";
+import {
+  DoctorDashboardPage,
+  doctorDashboardLoader,
+} from "@/pages/doctor-dashboard";
 
-function PatientOnlyRoute() {
-  const user = useAuthStore((s) => s.user);
-  if (user?.role !== "patient") return <Navigate to="/dashboard" replace />;
-  return <BookAppointmentPage />;
+function getRoleDashboard(role: string): string {
+  switch (role) {
+    case "admin":
+      return "/admin";
+    case "doctor":
+      return "/doctor";
+    case "patient":
+      return "/dashboard";
+    default:
+      return "/dashboard";
+  }
 }
 
-function AdminOnlyRoute() {
+function RoleOnlyRoute({
+  allowedRole,
+  children,
+}: {
+  allowedRole: string;
+  children: React.ReactNode;
+}) {
   const user = useAuthStore((s) => s.user);
-  if (user?.role !== "admin") return <Navigate to="/dashboard" replace />;
-  return <AdminDashboardPage />;
+  if (user?.role !== allowedRole) {
+    return <Navigate to={user ? getRoleDashboard(user.role) : "/login"} replace />;
+  }
+  return <>{children}</>;
+}
+
+function RootRedirect() {
+  const user = useAuthStore((s) => s.user);
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={getRoleDashboard(user.role)} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -69,20 +94,30 @@ export const router = createBrowserRouter([
     path: "/register",
     element: <RegisterPage />,
   },
-{
-        element: <ProtectedRoute />,
+  {
+    element: <ProtectedRoute />,
         errorElement: <RouteErrorPage />,
         children: [
       {
         path: "/",
-        element: <Navigate to="/dashboard" replace />,
+        element: <RootRedirect />,
       },
       {
         element: <AppLayout />,
         children: [
           {
             path: "/dashboard",
+            loader: dashboardLoader,
             element: <DashboardPage />,
+          },
+          {
+            path: "/doctor",
+            loader: doctorDashboardLoader,
+            element: (
+              <RoleOnlyRoute allowedRole="doctor">
+                <DoctorDashboardPage />
+              </RoleOnlyRoute>
+            ),
           },
           {
             path: "/profile",
@@ -112,7 +147,11 @@ export const router = createBrowserRouter([
           {
             path: "/admin",
             loader: adminLoader,
-            element: <AdminOnlyRoute />,
+            element: (
+              <RoleOnlyRoute allowedRole="admin">
+                <AdminDashboardPage />
+              </RoleOnlyRoute>
+            ),
           },
           {
             path: "/appointments",
@@ -127,7 +166,11 @@ export const router = createBrowserRouter([
           {
             path: "/appointments/book",
             loader: bookAppointmentLoader,
-            element: <PatientOnlyRoute />,
+            element: (
+              <RoleOnlyRoute allowedRole="patient">
+                <BookAppointmentPage />
+              </RoleOnlyRoute>
+            ),
           },
           {
             path: "/medical-records",

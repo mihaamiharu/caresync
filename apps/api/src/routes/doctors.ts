@@ -165,6 +165,138 @@ doctorsRoute.openapi(listDoctorsRoute, async (c) => {
   );
 });
 
+// ─── GET /doctors/me ──────────────────────────────────────────────────────────
+
+const doctorMeStatsResponse = z.object({
+  id: z.string(),
+  userId: z.string(),
+  departmentId: z.string(),
+  specialization: z.string(),
+  bio: z.string().nullable(),
+  licenseNumber: z.string(),
+  averageRating: z.number().nullable(),
+  reviewCount: z.number(),
+  user: userResponse,
+  department: departmentResponse,
+  stats: z.object({
+    totalAppointments: z.number(),
+    uniquePatients: z.number(),
+    todayAppointments: z.number(),
+  }),
+});
+
+const getDoctorMeRoute = createRoute({
+  method: "get",
+  path: "/doctors/me",
+  tags: ["Doctors"],
+  summary: "Get authenticated doctor's own profile and stats",
+  security: [{ bearerAuth: [] }],
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      description: "Doctor profile and stats",
+      content: {
+        "application/json": { schema: doctorMeStatsResponse },
+      },
+    },
+    401: {
+      description: "Not authenticated",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    403: {
+      description: "Not a doctor",
+      content: { "application/json": { schema: errorResponse } },
+    },
+    404: {
+      description: "Doctor profile not found",
+      content: { "application/json": { schema: errorResponse } },
+    },
+  },
+});
+
+doctorsRoute.openapi(getDoctorMeRoute, async (c) => {
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  if (userRole !== "doctor") {
+    return c.json({ message: "Forbidden: not a doctor" }, 403);
+  }
+
+  const [doctor] = await db
+    .select({
+      id: doctors.id,
+      userId: doctors.userId,
+      departmentId: doctors.departmentId,
+      specialization: doctors.specialization,
+      bio: doctors.bio,
+      licenseNumber: doctors.licenseNumber,
+      user: {
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        phone: users.phone,
+        avatarUrl: users.avatarUrl,
+      },
+      department: {
+        id: departments.id,
+        name: departments.name,
+      },
+    })
+    .from(doctors)
+    .innerJoin(users, eq(doctors.userId, users.id))
+    .innerJoin(departments, eq(doctors.departmentId, departments.id))
+    .where(eq(doctors.userId, userId))
+    .limit(1);
+
+  if (!doctor) {
+    return c.json({ message: "Doctor profile not found" }, 404);
+  }
+
+  const today = new Date().toISOString().substring(0, 10);
+
+  const [reviewStats] = await db
+    .select({
+      averageRating: sql<number | null>`avg(rating)::float`,
+      reviewCount: count(reviews.id),
+    })
+    .from(reviews)
+    .where(eq(reviews.doctorId, doctor.id));
+
+  const [appointmentStats] = await db
+    .select({
+      totalAppointments: count(appointments.id),
+      uniquePatients: sql<number>`count(DISTINCT ${appointments.patientId})`,
+    })
+    .from(appointments)
+    .where(eq(appointments.doctorId, doctor.id));
+
+  const [todayAppointments] = await db
+    .select({ count: count(appointments.id) })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.doctorId, doctor.id),
+        eq(appointments.appointmentDate, today)
+      )
+    );
+
+  return c.json(
+    {
+      ...doctor,
+      averageRating: reviewStats?.averageRating ?? null,
+      reviewCount: Number(reviewStats?.reviewCount ?? 0),
+      stats: {
+        totalAppointments: Number(appointmentStats?.totalAppointments ?? 0),
+        uniquePatients: Number(appointmentStats?.uniquePatients ?? 0),
+        todayAppointments: Number(todayAppointments?.count ?? 0),
+      },
+    },
+    200
+  );
+});
+
 // ─── GET /doctors/:id ──────────────────────────────────────────────────────────
 
 const getDoctorRoute = createRoute({
