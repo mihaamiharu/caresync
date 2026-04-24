@@ -25,6 +25,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       PORT: 3001
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
     volumes:
       - uploads:/app/apps/api/uploads
     depends_on:

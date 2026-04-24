@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { app } from "../app";
+import { clearRateLimitStore } from "../middleware/rate-limit";
 
 // Mock the database to avoid needing a real PostgreSQL connection
 vi.mock("../db", () => ({
@@ -231,12 +232,10 @@ describe("POST /auth/login", () => {
 });
 
 describe("POST /auth/refresh", () => {
-  async function getRefreshToken(): Promise<string> {
-    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([mockUser]) as any);
-    vi.mocked(verifyPassword).mockResolvedValueOnce(true);
+  async function getRefreshToken() {
     const loginRes = await app.request(LOGIN_URL, {
       method: "POST",
-      headers: jsonHeaders,
+      headers: { "Content-Type": "application/json" },
       body: jsonBody({ email: "patient@caresync.com", password: "password123" }),
     });
     const setCookie = loginRes.headers.get("set-cookie") ?? "";
@@ -245,6 +244,8 @@ describe("POST /auth/refresh", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearRateLimitStore();
+    vi.mocked(db.select).mockReturnValue(makeSelectChain([mockUser]) as any);
   });
 
   it("returns 200 with a new accessToken when user is active", async () => {
