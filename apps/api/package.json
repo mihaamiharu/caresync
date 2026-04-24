@@ -23,8 +23,9 @@
     "@hono/zod-openapi": "^0.18",
     "@scalar/hono-api-reference": "^0.5",
     "bcryptjs": "^2.4",
-    "drizzle-orm": "^0.38",
-    "hono": "^4.7",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.15",
+    "hono-rate-limit": "^1.0.2",
     "jsonwebtoken": "^9.0",
     "pg": "^8.13",
     "zod": "^3.24"

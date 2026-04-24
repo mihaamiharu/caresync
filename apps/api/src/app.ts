@@ -16,6 +16,8 @@ import { reviewsRoute } from "./routes/reviews";
 import { prescriptionsRoute } from "./routes/prescriptions";
 import { notificationsRoute } from "./routes/notifications";
 import { adminRoute } from "./routes/admin";
+import { env } from "./lib/env";
+import { rateLimitMiddleware } from "./middleware/rate-limit";
 
 export type AppEnv = {
   Variables: {
@@ -31,9 +33,15 @@ app.use("*", logger());
 app.use(
   "/api/*",
   cors({
-    origin: ["http://localhost:5173"],
+    origin: env.ALLOWED_ORIGIN,
     credentials: true,
   })
+);
+
+// Rate limit auth endpoints (50 requests per minute per IP)
+app.use(
+  "/api/v1/auth/login",
+  rateLimitMiddleware({ windowMs: 60 * 1000, max: 50 })
 );
 
 // Serve uploaded files

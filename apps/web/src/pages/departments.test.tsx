@@ -145,6 +145,7 @@ describe("DepartmentsPage — admin view", () => {
       isLoading: false,
     });
     vi.resetAllMocks();
+    vi.stubGlobal("confirm", vi.fn(() => true));
     vi.mocked(useLoaderData).mockReturnValue(mockDepts);
     revalidateMock = vi.fn();
     vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
