@@ -891,6 +891,99 @@ async function seed() {
   console.log("");
   console.log("Slice 5 complete. Moving to next slice...");
 
+  // ─── Notifications ─────────────────────────────────────────────────────────
+  // 30+ notifications distributed across users by role
+  // Patients: appointment reminders, results, prescriptions
+  // Doctors: new appointments, cancellations, schedule changes
+  // Admins: registrations, system alerts
+
+  const allUsers = [...adminUsers, ...doctorUsers, ...patientUsers];
+
+  const notificationTemplates: Array<{
+    userIndices: number[];
+    title: string;
+    message: string;
+    type: string;
+    link: string | null;
+  }> = [
+    // Patient appointment reminders (5)
+    { userIndices: [0, 1, 2, 3, 4], title: "Appointment Reminder", message: "You have an appointment tomorrow at 10:00 with Dr. Smith.", type: "appointment_reminder", link: "/appointments" },
+    { userIndices: [5, 6, 7, 8, 9], title: "Appointment Confirmed", message: "Your appointment on April 28 has been confirmed.", type: "appointment_confirmed", link: "/appointments" },
+    { userIndices: [10, 11, 12, 13, 14], title: "Lab Results Ready", message: "Your lab results from your visit on April 10 are now available.", type: "lab_results", link: "/medical-records" },
+    { userIndices: [15, 16, 17, 18, 19], title: "Prescription Ready", message: "Your prescription is ready for pickup at the pharmacy.", type: "prescription_ready", link: "/prescriptions" },
+    { userIndices: [20, 21, 22, 23, 24], title: "Appointment Reminder", message: "Reminder: you have an appointment in 2 hours with Dr. Jones.", type: "appointment_reminder", link: "/appointments" },
+    { userIndices: [25, 26, 27, 28, 29], title: "Follow-up Required", message: "Dr. Nguyen would like to schedule a follow-up appointment.", type: "follow_up", link: "/appointments" },
+    // Doctor notifications (5)
+    { userIndices: [30, 31], title: "New Appointment Booked", message: "A new appointment has been booked for April 27 at 14:00.", type: "new_appointment", link: "/schedule" },
+    { userIndices: [32, 33], title: "Appointment Cancelled", message: "Patient Emma Thompson has cancelled their appointment on April 28.", type: "appointment_cancelled", link: "/schedule" },
+    { userIndices: [34, 35], title: "Schedule Updated", message: "Your schedule for next week has been updated.", type: "schedule_change", link: "/schedule" },
+    { userIndices: [36, 37], title: "New Review Received", message: "You received a new 5-star review from a patient.", type: "new_review", link: "/reviews" },
+    { userIndices: [38, 39], title: "Lab Result Alert", message: "Patient Liam O'Brien's lab results show abnormal values.", type: "lab_alert", link: "/medical-records" },
+    // Admin notifications (5)
+    { userIndices: [40, 41], title: "New User Registration", message: "A new patient registered: Robert Fernandez.", type: "user_registration", link: "/admin/users" },
+    { userIndices: [40, 41], title: "Doctor License Expiring", message: "Dr. Adebayo's license LIC-003457 expires in 30 days.", type: "system_alert", link: "/admin/doctors" },
+    { userIndices: [40, 41], title: "System Backup Complete", message: "Automated database backup completed successfully.", type: "system_info", link: null },
+    { userIndices: [40, 41], title: "Appointment No-Show Report", message: "3 appointments were marked as no-show this week.", type: "report", link: "/admin/reports" },
+    { userIndices: [40, 41], title: "New Doctor Application", message: "Dr. Williams submitted an application to join the clinic.", type: "doctor_application", link: "/admin/doctors" },
+    // More varied patient notifications (10)
+    { userIndices: [0, 1], title: "Prescription Refill Reminder", message: "Your prescription for Metformin is due for a refill.", type: "prescription_reminder", link: "/prescriptions" },
+    { userIndices: [2, 3], title: "Appointment Rescheduled", message: "Your appointment has been rescheduled to May 2 at 11:00.", type: "appointment_rescheduled", link: "/appointments" },
+    { userIndices: [4, 5], title: "Vaccination Due", message: "Annual flu vaccination is now available. Book your appointment.", type: "vaccination_reminder", link: "/appointments" },
+    { userIndices: [6, 7], title: "Medical Record Updated", message: "A new medical record has been added to your profile.", type: "record_updated", link: "/medical-records" },
+    { userIndices: [8, 9], title: "Billing Statement", message: "Your invoice #INV-2026-001 has been paid. Thank you.", type: "billing", link: "/invoices" },
+    { userIndices: [10, 11], title: "Overdue Invoice", message: "Invoice #INV-2026-008 is overdue. Please arrange payment.", type: "billing", link: "/invoices" },
+    { userIndices: [12, 13], title: "Appointment Reminder", message: "You have an appointment tomorrow at 09:00 with Dr. Patel.", type: "appointment_reminder", link: "/appointments" },
+    { userIndices: [14, 15], title: "Prescription Ready", message: "Your prescription is ready for pickup.", type: "prescription_ready", link: "/prescriptions" },
+    { userIndices: [16, 17], title: "New Message from Doctor", message: "Dr. Wong sent you a message regarding your recent visit.", type: "message", link: "/messages" },
+    { userIndices: [18, 19], title: "Appointment Confirmed", message: "Your upcoming appointment on May 5 is confirmed.", type: "appointment_confirmed", link: "/appointments" },
+    { userIndices: [20, 21], title: "Lab Results Available", message: "Your blood test results are now available to view.", type: "lab_results", link: "/medical-records" },
+    // More doctor notifications (5)
+    { userIndices: [30, 31], title: "Patient Arrived", message: "Patient David Johansson has checked in for their 10:00 appointment.", type: "patient_arrived", link: "/schedule" },
+    { userIndices: [32, 33], title: "Schedule Conflict", message: "Two appointments are scheduled at 14:00 on May 3. Please resolve.", type: "schedule_conflict", link: "/schedule" },
+    { userIndices: [34, 35], title: "Prescription Request", message: "Patient Grace Wong requested a prescription renewal.", type: "rx_request", link: "/prescriptions" },
+    { userIndices: [36, 37], title: "New Appointment", message: "New appointment booked: Noah Kim with Dr. Tanaka on May 6.", type: "new_appointment", link: "/schedule" },
+    { userIndices: [38, 39], title: "Appointment Cancelled", message: "Patient Isabella Fischer cancelled their May 2 appointment.", type: "appointment_cancelled", link: "/schedule" },
+  ];
+
+  const notificationRows: Array<{
+    userId: string;
+    title: string;
+    message: string;
+    type: string;
+    isRead: boolean;
+    link: string | null;
+  }> = [];
+
+  for (const t of notificationTemplates) {
+    for (const idx of t.userIndices) {
+      if (idx < allUsers.length) {
+        notificationRows.push({
+          userId: allUsers[idx].id,
+          title: t.title,
+          message: t.message,
+          type: t.type,
+          isRead: fixedRand() > 0.6,
+          link: t.link,
+        });
+      }
+    }
+  }
+
+  const notifRows = await db.insert(notifications).values(notificationRows).returning();
+  console.log(`  ✓ ${notifRows.length} notifications created`);
+
+  const notifByRole: Record<string, number> = {};
+  for (const n of notificationRows) {
+    const user = allUsers.find((u) => u.id === n.userId);
+    if (user) {
+      notifByRole[user.role] = (notifByRole[user.role] ?? 0) + 1;
+    }
+  }
+  Object.entries(notifByRole).forEach(([role, count]) => console.log(`    ${role}: ${count}`));
+
+  console.log("");
+  console.log("All slices complete!");
+
   process.exit(0);
 }
 
