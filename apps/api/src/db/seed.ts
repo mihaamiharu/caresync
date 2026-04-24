@@ -389,10 +389,165 @@ async function seed() {
   }
   console.log(`  ✓ ${patientRows.length} patients created`);
 
+  // ─── Appointments ─────────────────────────────────────────────────────────
+  // Status distribution: ~25 completed, ~10 confirmed, ~8 pending, ~4 cancelled, ~3 no-show, ~1 in-progress
+  // Type distribution: ~60% consultation, ~30% follow-up, ~10% emergency
+  // Date range: Feb 1 – May 31 2026
+
+  type ApptStatus = "pending" | "confirmed" | "in-progress" | "completed" | "cancelled" | "no-show";
+  type ApptType = "consultation" | "follow-up" | "emergency";
+
+  const appointmentDefinitions: Array<{
+    patientIndex: number;
+    doctorIndex: number;
+    date: string;
+    startTime: string;
+    endTime: string;
+    status: ApptStatus;
+    type: ApptType;
+    reason: string;
+  }> = [];
+
+  let idx = 0;
+  const reasons = {
+    general: ["Annual physical", "Persistent cough", "Fatigue and low energy", "Headaches", "Skin rash", "Follow-up: blood pressure", "Follow-up: diabetes management", "Joint pain", "Abdominal pain", "Sleep difficulties"],
+    cardiology: ["Chest discomfort on exertion", "Palpitations", "Family history of heart disease", "Dizziness", "Shortness of breath", "Post-procedure follow-up"],
+    orthopedics: ["Knee pain after running", "Ankle sprain", "Lower back pain", "Shoulder stiffness", "Sports injury assessment", "Post-fracture follow-up"],
+    pediatrics: ["Ear infection", "Fever and fussiness", "Vaccination schedule", "Growth check", "Skin condition", "Behavioral concerns"],
+    dermatology: ["Moles consultation", "Acne treatment", "Eczema flare-up", "Psoriasis management", "Skin biopsy follow-up", "Cosmetic procedure consultation"],
+  };
+
+  const deptReasons = [
+    reasons.general,
+    reasons.cardiology,
+    reasons.orthopedics,
+    reasons.pediatrics,
+    reasons.dermatology,
+  ];
+
+  function rand<T>(arr: T[]): T {
+    return arr[Math.floor(fixedRand() * arr.length)];
+  }
+
+  let _seed = 42;
+  function fixedRand() {
+    _seed = (_seed * 1664525 + 1013904223) & 0xffffffff;
+    return (_seed >>> 0) / 0xffffffff;
+  }
+
+  function addAppt(
+    patientIdx: number,
+    doctorIdx: number,
+    date: string,
+    hour: number,
+    minute: number,
+    status: ApptStatus,
+    type: ApptType,
+    reason: string
+  ) {
+    const start = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const endH = minute === 30 ? hour + 1 : hour;
+    const endM = minute === 30 ? 0 : 30;
+    const end = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+    appointmentDefinitions.push({ patientIndex: patientIdx, doctorIndex: doctorIdx, date, startTime: start, endTime: end, status, type, reason });
+    idx++;
+  }
+
+  // Helper to add appointments across a date range
+  function addApptsForDoctor(
+    doctorIdx: number,
+    startDate: string,
+    endDate: string,
+    statuses: ApptStatus[],
+    types: ApptType[],
+    count: number
+  ) {
+    const [sy, sm, sd] = startDate.split("-").map(Number);
+    const [ey, em, ed] = endDate.split("-").map(Number);
+    const startTs = new Date(sy, sm - 1, sd).getTime();
+    const endTs = new Date(ey, em - 1, ed).getTime();
+    for (let i = 0; i < count; i++) {
+      const ts = startTs + fixedRand() * (endTs - startTs);
+      const d = new Date(ts);
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const hour = 8 + Math.floor(fixedRand() * 9);
+      const minute = fixedRand() > 0.5 ? 30 : 0;
+      const patientIdx = Math.floor(fixedRand() * patientRows.length);
+      appointmentDefinitions.push({
+        patientIndex: patientIdx,
+        doctorIndex: doctorIdx,
+        date,
+        startTime: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+        endTime: `${String(hour + (minute === 30 ? 1 : 0)).padStart(2, "0")}:${minute === 30 ? "00" : "30"}`,
+        status: rand(statuses),
+        type: rand(types),
+        reason: rand(deptReasons[doctorProfiles[doctorIdx].departmentIndex]),
+      });
+    }
+  }
+
+  // Completed: ~25 (Feb–early Apr)
+  addApptsForDoctor(0, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up", "emergency"], 8);
+  addApptsForDoctor(1, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up"], 4);
+  addApptsForDoctor(2, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up", "emergency"], 5);
+  addApptsForDoctor(3, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up"], 3);
+  addApptsForDoctor(4, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up"], 2);
+  addApptsForDoctor(5, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up", "emergency"], 3);
+  addApptsForDoctor(6, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up"], 2);
+  addApptsForDoctor(7, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up"], 2);
+  addApptsForDoctor(8, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up"], 2);
+  addApptsForDoctor(9, "2026-02-01", "2026-04-05", ["completed"], ["consultation", "follow-up"], 2);
+
+  // Confirmed: ~10 (mid Apr – May)
+  addApptsForDoctor(0, "2026-04-15", "2026-05-31", ["confirmed"], ["consultation", "follow-up"], 3);
+  addApptsForDoctor(1, "2026-04-15", "2026-05-31", ["confirmed"], ["consultation"], 2);
+  addApptsForDoctor(2, "2026-04-15", "2026-05-31", ["confirmed"], ["consultation", "emergency"], 2);
+  addApptsForDoctor(3, "2026-04-15", "2026-05-31", ["confirmed"], ["consultation", "follow-up"], 2);
+  addApptsForDoctor(4, "2026-04-15", "2026-05-31", ["confirmed"], ["consultation"], 1);
+
+  // Pending: ~8 (Apr – May)
+  addApptsForDoctor(0, "2026-04-20", "2026-05-31", ["pending"], ["consultation", "follow-up"], 3);
+  addApptsForDoctor(1, "2026-04-20", "2026-05-31", ["pending"], ["consultation"], 2);
+  addApptsForDoctor(5, "2026-04-20", "2026-05-31", ["pending"], ["consultation", "emergency"], 2);
+  addApptsForDoctor(6, "2026-04-20", "2026-05-31", ["pending"], ["consultation"], 1);
+
+  // Cancelled: ~4
+  addApptsForDoctor(0, "2026-03-01", "2026-04-20", ["cancelled"], ["consultation"], 2);
+  addApptsForDoctor(2, "2026-03-01", "2026-04-20", ["cancelled"], ["consultation"], 1);
+  addApptsForDoctor(4, "2026-03-01", "2026-04-20", ["cancelled"], ["consultation"], 1);
+
+  // No-show: ~3
+  addApptsForDoctor(1, "2026-02-15", "2026-04-01", ["no-show"], ["consultation"], 2);
+  addApptsForDoctor(3, "2026-02-15", "2026-04-01", ["no-show"], ["consultation"], 1);
+
+  // In-progress: ~1
+  addApptsForDoctor(0, "2026-04-25", "2026-04-25", ["in-progress"], ["consultation"], 1);
+
+  const apptRows = await db
+    .insert(appointments)
+    .values(
+      appointmentDefinitions.map((a) => ({
+        patientId: patientRows[a.patientIndex].id,
+        doctorId: doctorRows[a.doctorIndex].id,
+        appointmentDate: a.date,
+        startTime: a.startTime,
+        endTime: a.endTime,
+        status: a.status,
+        type: a.type,
+        reason: a.reason,
+      }))
+    )
+    .returning();
+
+  const statusCounts: Record<string, number> = {};
+  for (const a of appointmentDefinitions) {
+    statusCounts[a.status] = (statusCounts[a.status] ?? 0) + 1;
+  }
+  console.log(`  ✓ ${apptRows.length} appointments created`);
+  Object.entries(statusCounts).forEach(([s, c]) => console.log(`    ${s}: ${c}`));
+
   console.log("");
-  console.log(`Slice 2 complete: ${patientRows.length} patients seeded with varied demographics.`);
-  console.log("Demo patient accounts (password: Password123!):");
-  patientUsers.forEach((u) => console.log(`  ${u.email}`));
+  console.log("Slice 3 complete. Moving to next slice...");
 
   process.exit(0);
 }
