@@ -408,7 +408,6 @@ async function seed() {
     reason: string;
   }> = [];
 
-  let idx = 0;
   const reasons = {
     general: ["Annual physical", "Persistent cough", "Fatigue and low energy", "Headaches", "Skin rash", "Follow-up: blood pressure", "Follow-up: diabetes management", "Joint pain", "Abdominal pain", "Sleep difficulties"],
     cardiology: ["Chest discomfort on exertion", "Palpitations", "Family history of heart disease", "Dizziness", "Shortness of breath", "Post-procedure follow-up"],
@@ -433,24 +432,6 @@ async function seed() {
   function fixedRand() {
     _seed = (_seed * 1664525 + 1013904223) & 0xffffffff;
     return (_seed >>> 0) / 0xffffffff;
-  }
-
-  function addAppt(
-    patientIdx: number,
-    doctorIdx: number,
-    date: string,
-    hour: number,
-    minute: number,
-    status: ApptStatus,
-    type: ApptType,
-    reason: string
-  ) {
-    const start = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-    const endH = minute === 30 ? hour + 1 : hour;
-    const endM = minute === 30 ? 0 : 30;
-    const end = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
-    appointmentDefinitions.push({ patientIndex: patientIdx, doctorIndex: doctorIdx, date, startTime: start, endTime: end, status, type, reason });
-    idx++;
   }
 
   // Helper to add appointments across a date range
