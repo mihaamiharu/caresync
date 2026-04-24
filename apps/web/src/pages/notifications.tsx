@@ -5,6 +5,7 @@ import {
   useRevalidator,
 } from "react-router";
 import { Check, CheckCircle2, Circle } from "lucide-react";
+import { toast } from "sonner";
 import { notificationsApi } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import type { Notification as AppNotification } from "@caresync/shared";
@@ -28,18 +29,20 @@ export function NotificationsPage() {
   const handleMarkAsRead = async (id: string) => {
     try {
       await notificationsApi.markAsRead(id);
+      toast.success("Marked as read");
       revalidator.revalidate();
-    } catch (error) {
-      console.error("Failed to mark as read", error);
+    } catch {
+      toast.error("Failed to mark as read");
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
       await notificationsApi.markAllAsRead();
+      toast.success("All notifications marked as read");
       revalidator.revalidate();
-    } catch (error) {
-      console.error("Failed to mark all as read", error);
+    } catch {
+      toast.error("Failed to mark all as read");
     }
   };
 

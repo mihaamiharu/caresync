@@ -44,6 +44,7 @@ import {
   prescriptionDetailLoader,
 } from "@/pages/prescriptions/detail";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { RouteErrorPage } from "@/components/route-error-page";
 import { useAuthStore } from "@/stores/auth-store";
 import { AdminDashboardPage, adminLoader } from "@/pages/admin";
 
@@ -68,9 +69,10 @@ export const router = createBrowserRouter([
     path: "/register",
     element: <RegisterPage />,
   },
-  {
-    element: <ProtectedRoute />,
-    children: [
+{
+        element: <ProtectedRoute />,
+        errorElement: <RouteErrorPage />,
+        children: [
       {
         path: "/",
         element: <Navigate to="/dashboard" replace />,
