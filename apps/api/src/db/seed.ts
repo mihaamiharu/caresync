@@ -269,9 +269,9 @@ async function seed() {
   await db.delete(prescriptions);
   await db.delete(reviews);
   await db.delete(medicalRecords);
+  await db.delete(invoices);
   await db.delete(appointments);
   await db.delete(doctorSchedules);
-  await db.delete(invoices);
   await db.delete(patients);
   await db.delete(doctors);
   await db.delete(departments);
@@ -773,6 +773,123 @@ async function seed() {
 
   console.log("");
   console.log("Slice 4 complete. Moving to next slice...");
+
+  // ─── Reviews ─────────────────────────────────────────────────────────────
+  // 15+ reviews distributed across all 10 doctors (not concentrated on one)
+  // Reviews drawn from patients who had completed appointments with each doctor
+
+  const reviewComments = [
+    "Excellent doctor, very thorough and professional.",
+    "Great experience, highly recommended.",
+    "Very attentive and explained everything clearly.",
+    "Wait time was short, doctor was great.",
+    "Friendly staff and excellent care.",
+    "Dr. takes time to listen and answer questions.",
+    "Very satisfied with the consultation.",
+    "Clear instructions and kind demeanor.",
+    "Thorough examination with great follow-up.",
+    "Patient and helpful with my concerns.",
+    "Professional and competent.",
+    "Good bedside manner.",
+    "Highly knowledgeable and empathetic.",
+    "Efficient and effective care.",
+    "Would recommend to family and friends.",
+    "Detailed explanations, no rush.",
+    "Gentle approach, put me at ease.",
+  ];
+
+  const completedApptsByDoctor = new Map<string, typeof apptRows>();
+  for (const a of apptRows.filter((a) => a.status === "completed")) {
+    const list = completedApptsByDoctor.get(a.doctorId) ?? [];
+    list.push(a);
+    completedApptsByDoctor.set(a.doctorId, list);
+  }
+
+  const reviewData: Array<{ appointmentId: string; patientId: string; doctorId: string; rating: number; comment: string }> = [];
+  let commentIdx = 0;
+
+  for (const doctor of doctorRows) {
+    const docAppts = completedApptsByDoctor.get(doctor.id) ?? [];
+    const reviewCount = Math.min(docAppts.length, 2 + Math.floor(fixedRand() * 2));
+    for (let i = 0; i < reviewCount; i++) {
+      const appt = docAppts[i % docAppts.length];
+      reviewData.push({
+        appointmentId: appt.id,
+        patientId: appt.patientId,
+        doctorId: doctor.id,
+        rating: 3 + Math.floor(fixedRand() * 3),
+        comment: reviewComments[commentIdx % reviewComments.length],
+      });
+      commentIdx++;
+    }
+  }
+
+  const reviewRows = await db.insert(reviews).values(reviewData).returning();
+  console.log(`  ✓ ${reviewRows.length} reviews created across ${new Set(reviewData.map((r) => r.doctorId)).size} doctors`);
+
+  // ─── Invoices ────────────────────────────────────────────────────────────
+  // ~40% of completed appointments get invoices
+  // Status: ~10 paid, ~5 pending, ~3 overdue, ~2 cancelled
+  // Dates: Feb–Apr 2026, due dates 14–30 days after creation
+
+  const today = new Date(2026, 3, 25);
+
+  const completedList = apptRows.filter((a) => a.status === "completed");
+  const targetInvoiceCount = 22;
+  const step = Math.max(1, Math.floor(completedList.length / targetInvoiceCount));
+  const invoiceAppts = completedList.filter((_, i) => i % step === 0).slice(0, targetInvoiceCount);
+
+  const invoiceStatuses: Array<"pending" | "paid" | "overdue" | "cancelled"> = [
+    "paid", "paid", "paid", "paid", "paid", "paid", "paid", "paid", "paid", "paid",
+    "pending", "pending", "pending", "pending", "pending",
+    "overdue", "overdue", "overdue",
+    "cancelled", "cancelled",
+  ];
+
+  const invoiceData = invoiceAppts.map((a, i) => {
+    const status = invoiceStatuses[i] ?? "pending";
+    const [y, m, d] = a.appointmentDate.split("-").map(Number);
+    const apptDate = new Date(y, m - 1, d);
+    const dueDate = new Date(apptDate);
+    dueDate.setDate(dueDate.getDate() + 14 + Math.floor(fixedRand() * 16));
+
+    let paidAt: Date | null = null;
+    if (status === "paid") {
+      paidAt = new Date(apptDate);
+      const daysToPaid = Math.floor(fixedRand() * 20);
+      paidAt.setDate(paidAt.getDate() + daysToPaid);
+      if (paidAt > today) {
+        paidAt = new Date(today.getTime() - Math.floor(fixedRand() * 3) * 86400000);
+      }
+    }
+
+    const baseAmount = 50 + Math.floor(fixedRand() * 200);
+    const tax = Math.round(baseAmount * 0.08 * 100) / 100;
+    const total = Math.round((baseAmount + tax) * 100) / 100;
+
+    return {
+      appointmentId: a.id,
+      patientId: a.patientId,
+      amount: String(baseAmount.toFixed(2)),
+      tax: String(tax.toFixed(2)),
+      total: String(total.toFixed(2)),
+      status,
+      dueDate: `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}`,
+      paidAt: paidAt ? new Date(paidAt) : null,
+    };
+  });
+
+  const invoiceRows = await db.insert(invoices).values(invoiceData).returning();
+
+  const invoiceStatusCounts: Record<string, number> = {};
+  for (const inv of invoiceData) {
+    invoiceStatusCounts[inv.status] = (invoiceStatusCounts[inv.status] ?? 0) + 1;
+  }
+  console.log(`  ✓ ${invoiceRows.length} invoices created`);
+  Object.entries(invoiceStatusCounts).forEach(([s, c]) => console.log(`    ${s}: ${c}`));
+
+  console.log("");
+  console.log("Slice 5 complete. Moving to next slice...");
 
   process.exit(0);
 }
