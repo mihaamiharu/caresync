@@ -5,6 +5,7 @@ import {
   appointmentsApi,
   medicalRecordsApi,
   reviewsApi,
+  type ApiError,
 } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type {
@@ -12,7 +13,9 @@ import type {
   AppointmentStatus,
   MedicalRecord,
   Review,
-} from "@caresync/shared";
+  User,
+  Patient,
+  Doctor,} from "@caresync/shared";
 import { StatusBadge } from "./components/StatusBadge";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -142,9 +145,10 @@ function MedicalRecordSection({
         notes: notes || null,
       });
       setRecord(created);
-    } catch (err: any) {
+    } catch (err) {
       const msg =
-        err?.response?.data?.message ?? "Failed to create medical record.";
+        (err as ApiError)?.response?.data?.message ??
+        "Failed to create medical record.";
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -342,9 +346,10 @@ function ReviewSection({
         comment: comment.trim() || null,
       });
       setDone(true);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Failed to submit review.";
-      setError(msg);
+    } catch (err) {
+      const msg =
+        (err as ApiError)?.response?.data?.message ??
+        "Failed to submit review.";      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -457,9 +462,10 @@ export function AppointmentDetailPage() {
     try {
       const res = await appointmentsApi.updateStatus(id, targetStatus);
       setAppointment(res.appointment);
-    } catch (err: any) {
+    } catch (err) {
       const msg =
-        err?.response?.data?.message ?? "Failed to update appointment status.";
+        (err as ApiError)?.response?.data?.message ??
+        "Failed to update appointment status.";
       setActionError(msg);
     } finally {
       setUpdating(false);
@@ -469,8 +475,8 @@ export function AppointmentDetailPage() {
   const status = appointment.status as AppointmentStatus;
   const actions = getActions(user?.role, status);
 
-  const patient = appointment.patient as any;
-  const doctor = appointment.doctor as any;
+  const patient = appointment.patient as Patient & { user: User };
+  const doctor = appointment.doctor as Doctor & { user: User };
 
   return (
     <div data-testid="appointment-detail-page">

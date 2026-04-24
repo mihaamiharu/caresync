@@ -14,6 +14,7 @@ import { medicalRecordsRoute } from "./routes/medical-records";
 import { invoicesRoute } from "./routes/invoices";
 import { reviewsRoute } from "./routes/reviews";
 import { prescriptionsRoute } from "./routes/prescriptions";
+import { notificationsRoute } from "./routes/notifications";
 
 export type AppEnv = {
   Variables: {
@@ -54,6 +55,7 @@ app.route("/api/v1", medicalRecordsRoute);
 app.route("/api/v1", invoicesRoute);
 app.route("/api/v1", reviewsRoute);
 app.route("/api/v1", prescriptionsRoute);
+app.route("/api/v1", notificationsRoute);
 
 // OpenAPI spec
 app.doc("/api/openapi.json", {

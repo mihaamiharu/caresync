@@ -127,7 +127,7 @@ function DoctorScheduleForm({
         days: activeDays,
       });
       setSuccess(true);
-    } catch (err: unknown) {
+    } catch (err) {
       const axiosErr = err as {
         response?: { data?: { message?: string } };
       };

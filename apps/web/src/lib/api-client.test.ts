@@ -135,7 +135,7 @@ describe("medicalRecordsApi.uploadAttachment", () => {
 
 describe("apiClient auth interceptor", () => {
   it("attaches Authorization header when access token is set", async () => {
-    useAuthStore.setState({ accessToken: "at-789" } as any);
+    useAuthStore.setState({ accessToken: "at-789" } as never);
     let capturedAuth: string | null = null;
 
     server.use(

@@ -201,3 +201,14 @@ export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  isRead: boolean;
+  link: string | null;
+  createdAt: string;
+}

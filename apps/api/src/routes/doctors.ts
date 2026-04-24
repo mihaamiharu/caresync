@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, ilike, or, sql, and, asc, inArray, avg, count } from "drizzle-orm";
+import { eq, ilike, or, sql, and, asc, inArray, count } from "drizzle-orm";
 import { db } from "../db";
 import {
   users,
@@ -9,7 +9,6 @@ import {
   medicalRecords,
   doctorSchedules,
   reviews,
-  patients,
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { hashPassword } from "../lib/password";
@@ -241,13 +240,11 @@ doctorsRoute.openapi(getDoctorRoute, async (c) => {
     {
       ...doctor,
       averageRating: stats?.averageRating ?? null,
-      reviewCount: Number(stats?.reviewCount) ?? 0,
+      reviewCount: Number(stats?.reviewCount ?? 0),
     },
     200
   );
 });
-
-// ─── POST /doctors (admin) ───────────────────────────────────────────────────
 
 const createDoctorBody = z.object({
   email: z.string().email(),

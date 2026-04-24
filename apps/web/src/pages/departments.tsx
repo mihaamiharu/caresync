@@ -68,7 +68,7 @@ function DepartmentFormModal({
       }
       onSaved();
       onClose();
-    } catch (err: unknown) {
+    } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
       setServerError(msg ?? "Something went wrong. Please try again.");

@@ -592,7 +592,6 @@ async function seed() {
   console.log(
     "  ✓ Prescriptions created (8 total across 2 doctors + 2 patients)"
   );
-
   // --- Reviews (Seeding 15 reviews for Dr. Smith to test pagination/avg) ---
   console.log("  🌱 Seeding reviews for Dr. Smith...");
   const reviewsToCreate = [];

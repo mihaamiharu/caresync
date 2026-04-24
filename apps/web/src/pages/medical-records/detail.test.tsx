@@ -107,7 +107,7 @@ function renderDetailPage() {
 describe("MedicalRecordDetailPage — AttachmentsCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as any);
+    vi.mocked(useNavigation).mockReturnValue({ state: "idle" } as never);
     vi.mocked(useRevalidator).mockReturnValue({
       revalidate: vi.fn(),
       state: "idle",

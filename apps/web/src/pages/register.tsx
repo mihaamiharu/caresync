@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, Navigate, useNavigate } from "react-router";
 import { registerSchema, type RegisterInput } from "@caresync/shared";
-import { authApi } from "@/lib/api-client";
+import { authApi, type ApiError } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
 export function RegisterPage() {
@@ -31,11 +31,9 @@ export function RegisterPage() {
       const { accessToken, user } = await authApi.register(data);
       setAuth(user, accessToken);
       navigate("/dashboard", { replace: true });
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message;
-      setServerError(msg ?? "Something went wrong. Please try again.");
+    } catch (err) {
+      const axiosError = err as ApiError;
+      setServerError(axiosError.response?.data?.message ?? "Something went wrong. Please try again.");
     }
   };
 

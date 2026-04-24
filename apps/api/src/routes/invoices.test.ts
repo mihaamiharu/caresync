@@ -160,7 +160,10 @@ describe("POST /invoices", () => {
     const res = await app.request(INVOICES_URL, {
       method: "POST",
       headers: { ...jsonHeaders, ...bearer(adminToken) },
-      body: JSON.stringify({ appointmentId: APPOINTMENT_ID, amount: "invalid" }),
+      body: JSON.stringify({
+        appointmentId: APPOINTMENT_ID,
+        amount: "invalid",
+      }),
     });
     expect(res.status).toBe(400);
   });
@@ -175,8 +178,7 @@ describe("POST /invoices", () => {
   });
 
   it("returns 404 when appointment does not exist", async () => {
-    vi.mocked(db.select)
-      .mockReturnValueOnce(makeSelectChain([]) as any);
+    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]) as any);
 
     const res = await app.request(INVOICES_URL, {
       method: "POST",
@@ -206,11 +208,16 @@ describe("POST /invoices", () => {
   it("returns 201 and creates the invoice", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([{ id: APPOINTMENT_ID }]) as any)
-      .mockReturnValueOnce(makeSelectChain([]) as any);
+      .mockReturnValueOnce(makeSelectChain([]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ userId: USER_PATIENT_ID }]) as any
+      );
 
-    vi.mocked(db.insert).mockReturnValueOnce(
-      makeInsertWithReturning([mockInvoice]) as any
-    );
+    vi.mocked(db.insert)
+      .mockReturnValueOnce(makeInsertWithReturning([mockInvoice]) as any)
+      .mockReturnValueOnce(
+        makeInsertWithReturning([{ id: "notif-id" }]) as any
+      );
 
     const res = await app.request(INVOICES_URL, {
       method: "POST",
@@ -230,11 +237,20 @@ describe("POST /invoices", () => {
   it("returns 201 with default tax of 0 when tax is not provided", async () => {
     vi.mocked(db.select)
       .mockReturnValueOnce(makeSelectChain([{ id: APPOINTMENT_ID }]) as any)
-      .mockReturnValueOnce(makeSelectChain([]) as any);
+      .mockReturnValueOnce(makeSelectChain([]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ userId: USER_PATIENT_ID }]) as any
+      );
 
-    vi.mocked(db.insert).mockReturnValueOnce(
-      makeInsertWithReturning([{ ...mockInvoice, tax: "0.00", total: "150.00" }]) as any
-    );
+    vi.mocked(db.insert)
+      .mockReturnValueOnce(
+        makeInsertWithReturning([
+          { ...mockInvoice, tax: "0.00", total: "150.00" },
+        ]) as any
+      )
+      .mockReturnValueOnce(
+        makeInsertWithReturning([{ id: "notif-id" }]) as any
+      );
 
     const res = await app.request(INVOICES_URL, {
       method: "POST",
@@ -431,7 +447,11 @@ describe("PATCH /invoices/:id/pay", () => {
       makeSelectChain([{ ...mockInvoice }]) as any
     );
 
-    const updatedInvoice = { ...mockInvoice, status: "paid", paidAt: new Date().toISOString() };
+    const updatedInvoice = {
+      ...mockInvoice,
+      status: "paid",
+      paidAt: new Date().toISOString(),
+    };
     const returning = vi.fn().mockResolvedValue([updatedInvoice]);
     const where = vi.fn().mockReturnValue({ returning });
     const set = vi.fn().mockReturnValue({ where });
@@ -449,10 +469,16 @@ describe("PATCH /invoices/:id/pay", () => {
 
   it("returns 200 when patient pays own invoice", async () => {
     vi.mocked(db.select)
-      .mockReturnValueOnce(makeSelectChain([{ ...mockInvoice, patientId: PATIENT_ID }]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([{ ...mockInvoice, patientId: PATIENT_ID }]) as any
+      )
       .mockReturnValueOnce(makeSelectChain([{ id: PATIENT_ID }]) as any);
 
-    const updatedInvoice = { ...mockInvoice, status: "paid", paidAt: new Date().toISOString() };
+    const updatedInvoice = {
+      ...mockInvoice,
+      status: "paid",
+      paidAt: new Date().toISOString(),
+    };
     const returning = vi.fn().mockResolvedValue([updatedInvoice]);
     const where = vi.fn().mockReturnValue({ returning });
     const set = vi.fn().mockReturnValue({ where });
@@ -467,7 +493,11 @@ describe("PATCH /invoices/:id/pay", () => {
 
   it("returns 403 when patient tries to pay another patient's invoice", async () => {
     vi.mocked(db.select)
-      .mockReturnValueOnce(makeSelectChain([{ ...mockInvoice, patientId: "different-patient" }]) as any)
+      .mockReturnValueOnce(
+        makeSelectChain([
+          { ...mockInvoice, patientId: "different-patient" },
+        ]) as any
+      )
       .mockReturnValueOnce(makeSelectChain([{ id: PATIENT_ID }]) as any);
     const res = await app.request(PAY_URL, {
       method: "PATCH",

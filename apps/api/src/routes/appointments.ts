@@ -10,6 +10,7 @@ import {
   doctorSchedules,
   users,
   invoices,
+  notifications,
 } from "../db/schema";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { computeAvailableSlots } from "../lib/schedule-service";
@@ -270,15 +271,15 @@ appointmentsRoute.openapi(getAppointmentRoute, async (c) => {
   }
 
   const {
-    passwordHash: _ph1,
-    createdAt: _pc,
-    updatedAt: _pu,
+    passwordHash: _1,
+    createdAt: _2,
+    updatedAt: _3,
     ...patientUserSafe
   } = row.patientUser;
   const {
-    passwordHash: _ph2,
-    createdAt: _dc,
-    updatedAt: _du,
+    passwordHash: _4,
+    createdAt: _5,
+    updatedAt: _6,
     ...doctorUserSafe
   } = row.doctorUser;
 
@@ -421,6 +422,15 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
     .where(eq(appointments.id, id))
     .returning();
 
+  // Create notification for appointment status change
+  await db.insert(notifications).values({
+    userId: row.patient.userId,
+    title: "Appointment Status Updated",
+    message: `Your appointment with Dr. ${row.doctorUser.lastName} is now ${newStatus}.`,
+    type: "appointment",
+    link: `/patient/appointments/${id}`,
+  });
+
   // 5b. Auto-generate invoice when appointment is completed
   if (newStatus === "completed") {
     const [existingInvoice] = await db
@@ -439,21 +449,34 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
       const amount = feeMap[row.appointment.type] ?? "100000.00";
       const taxRate = 0.11; // 11% PPN
       const taxAmount = (parseFloat(amount) * taxRate).toFixed(2);
-      const totalAmount = (parseFloat(amount) + parseFloat(taxAmount)).toFixed(2);
+      const totalAmount = (parseFloat(amount) + parseFloat(taxAmount)).toFixed(
+        2
+      );
 
       // Due date: 7 days from now
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7);
       const dueDateStr = dueDate.toISOString().substring(0, 10);
 
-      await db.insert(invoices).values({
-        appointmentId: id,
-        patientId: row.appointment.patientId,
-        amount,
-        tax: taxAmount,
-        total: totalAmount,
-        status: "pending",
-        dueDate: dueDateStr,
+      const [newInvoice] = await db
+        .insert(invoices)
+        .values({
+          appointmentId: id,
+          patientId: row.appointment.patientId,
+          amount,
+          tax: taxAmount,
+          total: totalAmount,
+          status: "pending",
+          dueDate: dueDateStr,
+        })
+        .returning();
+
+      await db.insert(notifications).values({
+        userId: row.patient.userId,
+        title: "New Invoice Generated",
+        message: `An invoice of Rp ${totalAmount} has been generated for your appointment.`,
+        type: "invoice",
+        link: `/patient/invoices/${newInvoice.id}`,
       });
     }
   }
@@ -478,15 +501,15 @@ appointmentsRoute.openapi(patchStatusRoute, async (c) => {
   const updated = updatedRows[0]!;
 
   const {
-    passwordHash: _ph1,
-    createdAt: _pc,
-    updatedAt: _pu,
+    passwordHash: _1,
+    createdAt: _2,
+    updatedAt: _3,
     ...patientUserSafe
   } = updated.patientUser;
   const {
-    passwordHash: _ph2,
-    createdAt: _dc,
-    updatedAt: _du,
+    passwordHash: _4,
+    createdAt: _5,
+    updatedAt: _6,
     ...doctorUserSafe
   } = updated.doctorUser;
 
@@ -709,9 +732,18 @@ appointmentsRoute.openapi(createAppointmentRoute, async (c) => {
       })
       .returning();
 
+    // Create notification for new appointment
+    await db.insert(notifications).values({
+      userId,
+      title: "New Appointment Booked",
+      message: `Your appointment on ${appointmentDate} has been scheduled.`,
+      type: "appointment",
+      link: `/patient/appointments/${appointment.id}`,
+    });
+
     return c.json(appointment, 201);
-  } catch (error: any) {
-    if (error?.code === "23505") {
+  } catch (error) {
+    if ((error as { code?: string })?.code === "23505") {
       return c.json(
         { message: "This slot was just booked — please select another" },
         409

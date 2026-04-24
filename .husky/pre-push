@@ -1,0 +1,2 @@
+pnpm lint
+pnpm turbo test --filter=!@caresync/e2e

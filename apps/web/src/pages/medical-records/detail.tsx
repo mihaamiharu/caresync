@@ -85,7 +85,7 @@ function AttachmentsCard({
     for (const file of Array.from(files)) {
       try {
         await onUpload(file);
-      } catch (err: unknown) {
+      } catch (err) {
         const msg =
           (err as { response?: { data?: { message?: string } } })?.response
             ?.data?.message ?? "Upload failed";
@@ -270,8 +270,7 @@ function PrescriptionModal({
       reset();
       onOpenChange(false);
       onSuccess();
-    } catch (err: unknown) {
-      const msg =
+    } catch (err) {      const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ?? "Failed to create prescription";
       toast.error(msg);

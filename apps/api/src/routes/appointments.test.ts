@@ -93,6 +93,11 @@ function makeInsertWithReturning(result: unknown[]) {
   return { values };
 }
 
+function makeInsertChain() {
+  const values = vi.fn().mockResolvedValue(undefined);
+  return { values };
+}
+
 const validBody = {
   doctorId: DOCTOR_ID,
   appointmentDate: FUTURE_DATE,
@@ -314,9 +319,9 @@ describe("POST /appointments", () => {
       .mockReturnValueOnce(makeSelectChain([]) as any) // no existing appointment
       .mockReturnValueOnce(makeSelectChain([mockSchedule]) as any);
 
-    vi.mocked(db.insert).mockReturnValueOnce(
-      makeInsertWithReturning([mockAppointment]) as any
-    );
+    vi.mocked(db.insert)
+      .mockReturnValueOnce(makeInsertWithReturning([mockAppointment]) as any)
+      .mockReturnValueOnce(makeInsertChain() as any);
 
     const res = await app.request(APPOINTMENTS_URL, {
       method: "POST",
@@ -340,7 +345,8 @@ describe("POST /appointments", () => {
 
     vi.mocked(db.insert)
       .mockReturnValueOnce(makeInsertWithReturning([mockPatient]) as any) // auto-create patient
-      .mockReturnValueOnce(makeInsertWithReturning([mockAppointment]) as any); // create appointment
+      .mockReturnValueOnce(makeInsertWithReturning([mockAppointment]) as any) // create appointment
+      .mockReturnValueOnce(makeInsertChain() as any); // notification
 
     const res = await app.request(APPOINTMENTS_URL, {
       method: "POST",
@@ -359,11 +365,13 @@ describe("POST /appointments", () => {
       .mockReturnValueOnce(makeSelectChain([]) as any) // no existing appointment
       .mockReturnValueOnce(makeSelectChain([mockSchedule]) as any);
 
-    vi.mocked(db.insert).mockReturnValueOnce(
-      makeInsertWithReturning([
-        { ...mockAppointment, reason: null, notes: null },
-      ]) as any
-    );
+    vi.mocked(db.insert)
+      .mockReturnValueOnce(
+        makeInsertWithReturning([
+          { ...mockAppointment, reason: null, notes: null },
+        ]) as any
+      )
+      .mockReturnValueOnce(makeInsertChain() as any);
 
     const { reason: _, ...bodyNoReason } = validBody;
     const res = await app.request(APPOINTMENTS_URL, {
@@ -672,6 +680,7 @@ describe("PATCH /appointments/:id/status", () => {
     vi.mocked(db.update).mockReturnValueOnce(
       makeUpdateChain([{ id: APPT_ID, status: "cancelled" }]) as any
     );
+    vi.mocked(db.insert).mockReturnValueOnce(makeInsertChain() as any);
     const res = await app.request(STATUS_URL, {
       method: "PATCH",
       headers: { ...jsonH, ...bearer(patientToken) },
@@ -696,6 +705,7 @@ describe("PATCH /appointments/:id/status", () => {
     vi.mocked(db.update).mockReturnValueOnce(
       makeUpdateChain([{ id: APPT_ID, status: "confirmed" }]) as any
     );
+    vi.mocked(db.insert).mockReturnValueOnce(makeInsertChain() as any);
     const res = await app.request(STATUS_URL, {
       method: "PATCH",
       headers: { ...jsonH, ...bearer(doctorToken) },
@@ -720,6 +730,7 @@ describe("PATCH /appointments/:id/status", () => {
     vi.mocked(db.update).mockReturnValueOnce(
       makeUpdateChain([{ id: APPT_ID, status: "confirmed" }]) as any
     );
+    vi.mocked(db.insert).mockReturnValueOnce(makeInsertChain() as any);
     const res = await app.request(STATUS_URL, {
       method: "PATCH",
       headers: { ...jsonH, ...bearer(adminToken) },

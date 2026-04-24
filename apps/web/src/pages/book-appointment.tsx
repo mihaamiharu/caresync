@@ -734,15 +734,23 @@ export function BookAppointmentPage() {
         step: 5,
         completedSteps: new Set([...s.completedSteps, 4]),
       }));
-    } catch (err: any) {
-      const status = err?.response?.status;
+    } catch (err) {
+      const axiosError = err as {
+        response?: {
+          status?: number;
+          data?: {
+            message?: string;
+          };
+        };
+      };
+      const status = axiosError.response?.status;
       let errMsg: string;
       if (status === 409) {
         errMsg =
           "This slot was just booked by someone else — please go back and select another time.";
       } else {
         errMsg =
-          err?.response?.data?.message ??
+          axiosError.response?.data?.message ??
           "Failed to book appointment. Please try again.";
       }
       setSubmitError(errMsg);

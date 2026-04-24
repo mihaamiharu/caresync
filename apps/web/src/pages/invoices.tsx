@@ -294,7 +294,7 @@ export function InvoiceDetailPage() {
         await invoicesApi.payInvoice(params.id!);
         setPaymentState("success");
         revalidator.revalidate();
-      } catch (err: unknown) {
+      } catch (err) {
         const axiosError = err as {
           response?: { data?: { message?: string } };
         };

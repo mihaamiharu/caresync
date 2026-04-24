@@ -1,0 +1,301 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.4 [39m[90m/home/mihaamiharu/caresync/apps/api[39m
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 401 when no Authorization header is provided
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 401 when no Authorization header is provided
+[22m[39m--> POST /api/v1/invoices [33m401[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 403 when called by patient
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 403 when called by patient
+[22m[39m--> POST /api/v1/invoices [33m403[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 403 when called by doctor
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 403 when called by doctor
+[22m[39m--> POST /api/v1/invoices [33m403[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when appointmentId is missing
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when appointmentId is missing
+[22m[39m--> POST /api/v1/invoices [33m400[0m 2ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when amount is missing
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when amount is missing
+[22m[39m--> POST /api/v1/invoices [33m400[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when amount is not a valid number
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when amount is not a valid number
+[22m[39m--> POST /api/v1/invoices [33m400[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when amount is negative
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 400 when amount is negative
+[22m[39m--> POST /api/v1/invoices [33m400[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 404 when appointment does not exist
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 404 when appointment does not exist
+[22m[39m--> POST /api/v1/invoices [33m404[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 409 when invoice already exists for appointment
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 409 when invoice already exists for appointment
+[22m[39m--> POST /api/v1/invoices [33m409[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 201 and creates the invoice
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstderr[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 201 and creates the invoice
+[22m[39mTypeError: Cannot read properties of undefined (reading 'patients')
+    at [90m/home/mihaamiharu/caresync/apps/api/[39msrc/routes/invoices.ts:136:41
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/validator/validator.js:81:12
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at [90m/home/mihaamiharu/caresync/apps/api/[39msrc/middleware/auth.ts:28:5
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at [90m/home/mihaamiharu/caresync/apps/api/[39msrc/middleware/auth.ts:16:5
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at cors2 (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/middleware/cors/index.js:82:5)
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 201 and creates the invoice
+[22m[39m--> POST /api/v1/invoices [31m500[0m 10ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 201 with default tax of 0 when tax is not provided
+[22m[39m<-- POST /api/v1/invoices
+
+[90mstderr[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 201 with default tax of 0 when tax is not provided
+[22m[39mTypeError: Cannot read properties of undefined (reading 'patients')
+    at [90m/home/mihaamiharu/caresync/apps/api/[39msrc/routes/invoices.ts:136:41
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/validator/validator.js:81:12
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at [90m/home/mihaamiharu/caresync/apps/api/[39msrc/middleware/auth.ts:28:5
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at [90m/home/mihaamiharu/caresync/apps/api/[39msrc/middleware/auth.ts:16:5
+    at dispatch (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/compose.js:22:17)
+    at cors2 (file:///home/mihaamiharu/caresync/node_modules/[4m.pnpm[24m/hono@4.12.12/node_modules/[4mhono[24m/dist/middleware/cors/index.js:82:5)
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPOST /invoices[2m > [22m[2mreturns 201 with default tax of 0 when tax is not provided
+[22m[39m--> POST /api/v1/invoices [31m500[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m<-- GET /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m--> GET /api/v1/invoices [33m401[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices[2m > [22m[2mreturns 200 with paginated list for patient role (own invoices only)
+[22m[39m<-- GET /api/v1/invoices
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices[2m > [22m[2mreturns 200 with paginated list for patient role (own invoices only)
+[22m[39m--> GET /api/v1/invoices [32m200[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m<-- GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m--> GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010 [33m401[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 404 when invoice does not exist
+[22m[39m<-- GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 404 when invoice does not exist
+[22m[39m--> GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010 [33m404[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 200 with invoice detail for admin
+[22m[39m<-- GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 200 with invoice detail for admin
+[22m[39m--> GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010 [32m200[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 200 when patient accesses own invoice
+[22m[39m<-- GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mGET /invoices/:id[2m > [22m[2mreturns 200 when patient accesses own invoice
+[22m[39m--> GET /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010 [32m200[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [33m401[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 403 when doctor tries to pay invoice
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 403 when doctor tries to pay invoice
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [33m403[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 404 when invoice does not exist
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 404 when invoice does not exist
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [33m404[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 400 when invoice is already paid
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 400 when invoice is already paid
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [33m400[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 400 when invoice is cancelled
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 400 when invoice is cancelled
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [33m400[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 200 and marks invoice as paid
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 200 and marks invoice as paid
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [32m200[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 200 when patient pays own invoice
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 200 when patient pays own invoice
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [32m200[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 403 when patient tries to pay another patient's invoice
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/pay[2m > [22m[2mreturns 403 when patient tries to pay another patient's invoice
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/pay [33m403[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 401 when no Authorization header
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel [33m401[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 403 when patient tries to cancel invoice
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 403 when patient tries to cancel invoice
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel [33m403[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 403 when doctor tries to cancel invoice
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 403 when doctor tries to cancel invoice
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel [33m403[0m 1ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 404 when invoice does not exist
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 404 when invoice does not exist
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel [33m404[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 400 when invoice is already paid
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 400 when invoice is already paid
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel [33m400[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 400 when invoice is already cancelled
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 400 when invoice is already cancelled
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel [33m400[0m 0ms
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 200 and marks invoice as cancelled
+[22m[39m<-- PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel
+
+[90mstdout[2m | src/routes/invoices.test.ts[2m > [22m[2mPATCH /invoices/:id/cancel[2m > [22m[2mreturns 200 and marks invoice as cancelled
+[22m[39m--> PATCH /api/v1/invoices/a1b2c3d4-0000-4000-8000-000000000010/cancel [32m200[0m 0ms
+
+ [31m❯[39m src/routes/invoices.test.ts [2m([22m[2m32 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 71[2mms[22m[39m
+     [32m✓[39m returns 401 when no Authorization header is provided[32m 23[2mms[22m[39m
+     [32m✓[39m returns 403 when called by patient[32m 2[2mms[22m[39m
+     [32m✓[39m returns 403 when called by doctor[32m 1[2mms[22m[39m
+     [32m✓[39m returns 400 when appointmentId is missing[32m 3[2mms[22m[39m
+     [32m✓[39m returns 400 when amount is missing[32m 1[2mms[22m[39m
+     [32m✓[39m returns 400 when amount is not a valid number[32m 1[2mms[22m[39m
+     [32m✓[39m returns 400 when amount is negative[32m 1[2mms[22m[39m
+     [32m✓[39m returns 404 when appointment does not exist[32m 1[2mms[22m[39m
+     [32m✓[39m returns 409 when invoice already exists for appointment[32m 2[2mms[22m[39m
+[31m     [31m×[31m returns 201 and creates the invoice[39m[32m 15[2mms[22m[39m
+[31m     [31m×[31m returns 201 with default tax of 0 when tax is not provided[39m[32m 2[2mms[22m[39m
+     [32m✓[39m returns 401 when no Authorization header[32m 0[2mms[22m[39m
+     [32m✓[39m returns 200 with paginated list for patient role (own invoices only)[32m 2[2mms[22m[39m
+     [32m✓[39m returns 401 when no Authorization header[32m 1[2mms[22m[39m
+     [32m✓[39m returns 404 when invoice does not exist[32m 1[2mms[22m[39m
+     [32m✓[39m returns 200 with invoice detail for admin[32m 1[2mms[22m[39m
+     [32m✓[39m returns 200 when patient accesses own invoice[32m 1[2mms[22m[39m
+     [32m✓[39m returns 401 when no Authorization header[32m 0[2mms[22m[39m
+     [32m✓[39m returns 403 when doctor tries to pay invoice[32m 1[2mms[22m[39m
+     [32m✓[39m returns 404 when invoice does not exist[32m 1[2mms[22m[39m
+     [32m✓[39m returns 400 when invoice is already paid[32m 1[2mms[22m[39m
+     [32m✓[39m returns 400 when invoice is cancelled[32m 1[2mms[22m[39m
+     [32m✓[39m returns 200 and marks invoice as paid[32m 1[2mms[22m[39m
+     [32m✓[39m returns 200 when patient pays own invoice[32m 1[2mms[22m[39m
+     [32m✓[39m returns 403 when patient tries to pay another patient's invoice[32m 1[2mms[22m[39m
+     [32m✓[39m returns 401 when no Authorization header[32m 1[2mms[22m[39m
+     [32m✓[39m returns 403 when patient tries to cancel invoice[32m 1[2mms[22m[39m
+     [32m✓[39m returns 403 when doctor tries to cancel invoice[32m 1[2mms[22m[39m
+     [32m✓[39m returns 404 when invoice does not exist[32m 1[2mms[22m[39m
+     [32m✓[39m returns 400 when invoice is already paid[32m 1[2mms[22m[39m
+     [32m✓[39m returns 400 when invoice is already cancelled[32m 1[2mms[22m[39m
+     [32m✓[39m returns 200 and marks invoice as cancelled[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/routes/invoices.test.ts[2m > [22mPOST /invoices[2m > [22mreturns 201 and creates the invoice
+[31m[1mAssertionError[22m: expected 500 to be 201 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 201[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m src/routes/invoices.test.ts:[2m224:24[22m[39m
+    [90m222|[39m       })[33m,[39m
+    [90m223|[39m     })[33m;[39m
+    [90m224|[39m     [34mexpect[39m(res[33m.[39mstatus)[33m.[39m[34mtoBe[39m([34m201[39m)[33m;[39m
+    [90m   |[39m                        [31m^[39m
+    [90m225|[39m     [35mconst[39m body [33m=[39m [35mawait[39m res[33m.[39m[34mjson[39m()[33m;[39m
+    [90m226|[39m     [34mexpect[39m(body[33m.[39mid)[33m.[39m[34mtoBe[39m([33mINVOICE_ID[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/routes/invoices.test.ts[2m > [22mPOST /invoices[2m > [22mreturns 201 with default tax of 0 when tax is not provided
+[31m[1mAssertionError[22m: expected 500 to be 201 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 201[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m src/routes/invoices.test.ts:[2m244:24[22m[39m
+    [90m242|[39m       body: JSON.stringify({ appointmentId: APPOINTMENT_ID, amount: "1…
+    [90m243|[39m     })[33m;[39m
+    [90m244|[39m     [34mexpect[39m(res[33m.[39mstatus)[33m.[39m[34mtoBe[39m([34m201[39m)[33m;[39m
+    [90m   |[39m                        [31m^[39m
+    [90m245|[39m   })[33m;[39m
+    [90m246|[39m })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m30 passed[39m[22m[90m (32)[39m
+[2m   Start at [22m 07:33:35
+[2m   Duration [22m 904ms[2m (transform 314ms, setup 0ms, import 714ms, tests 71ms, environment 0ms)[22m
+
