@@ -20,7 +20,9 @@ import type {
   CreatePrescriptionInput,
   UpdatePrescriptionInput,
   PrescriptionItem,
-  Notification,} from "@caresync/shared";
+  Notification,
+  AdminStatsResponse,
+} from "@caresync/shared";
 import { useAuthStore } from "@/stores/auth-store";
 
 export interface ApiError {
@@ -603,6 +605,15 @@ export const notificationsApi = {
     const res = await apiClient.patch<{ success: boolean }>(
       "/api/v1/notifications/read-all"
     );
+    return res.data;
+  },
+};
+
+// ─── Admin API ────────────────────────────────────────────────────────────────
+
+export const adminApi = {
+  getStats: async (): Promise<AdminStatsResponse> => {
+    const res = await apiClient.get<AdminStatsResponse>("/api/v1/admin/stats");
     return res.data;
   },
 };
