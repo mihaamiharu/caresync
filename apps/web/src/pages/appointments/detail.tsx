@@ -5,6 +5,7 @@ import {
   appointmentsApi,
   medicalRecordsApi,
   reviewsApi,
+  type ApiError,
 } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type {

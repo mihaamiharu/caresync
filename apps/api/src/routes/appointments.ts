@@ -743,7 +743,7 @@ appointmentsRoute.openapi(createAppointmentRoute, async (c) => {
 
     return c.json(appointment, 201);
   } catch (error) {
-    if (error?.code === "23505") {
+    if ((error as { code?: string })?.code === "23505") {
       return c.json(
         { message: "This slot was just booked — please select another" },
         409

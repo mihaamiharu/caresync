@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, ilike, or, sql, and, asc, inArray, _avg, count } from "drizzle-orm";
+import { eq, ilike, or, sql, and, asc, inArray, count } from "drizzle-orm";
 import { db } from "../db";
 import {
   users,
