@@ -13,6 +13,7 @@ import {
   HeartPulse,
   LogOut,
   PillIcon,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -30,6 +31,7 @@ const navItems = [
   },
   { to: "/doctors", label: "Doctors", icon: Stethoscope, roles: null },
   { to: "/patients", label: "Patients", icon: Users, roles: ["admin"] },
+  { to: "/admin", label: "Admin Dashboard", icon: LayoutGrid, roles: ["admin"] },
   {
     to: "/medical-records",
     label: "Medical Records",

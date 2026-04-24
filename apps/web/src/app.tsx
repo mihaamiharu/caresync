@@ -45,11 +45,18 @@ import {
 } from "@/pages/prescriptions/detail";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuthStore } from "@/stores/auth-store";
+import { AdminDashboardPage, adminLoader } from "@/pages/admin";
 
 function PatientOnlyRoute() {
   const user = useAuthStore((s) => s.user);
   if (user?.role !== "patient") return <Navigate to="/dashboard" replace />;
   return <BookAppointmentPage />;
+}
+
+function AdminOnlyRoute() {
+  const user = useAuthStore((s) => s.user);
+  if (user?.role !== "admin") return <Navigate to="/dashboard" replace />;
+  return <AdminDashboardPage />;
 }
 
 export const router = createBrowserRouter([
@@ -99,6 +106,11 @@ export const router = createBrowserRouter([
             path: "/patients",
             loader: patientsLoader,
             element: <PatientsPage />,
+          },
+          {
+            path: "/admin",
+            loader: adminLoader,
+            element: <AdminOnlyRoute />,
           },
           {
             path: "/appointments",
