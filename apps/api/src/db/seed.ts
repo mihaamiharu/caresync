@@ -981,8 +981,33 @@ async function seed() {
   }
   Object.entries(notifByRole).forEach(([role, count]) => console.log(`    ${role}: ${count}`));
 
+  // ─── Final Summary ───────────────────────────────────────────────────────
   console.log("");
-  console.log("All slices complete!");
+  console.log("=".repeat(60));
+  console.log("✅ Seed complete!");
+  console.log("=".repeat(60));
+  console.log("");
+  console.log("Test credentials (password: Password123!):");
+  console.log("");
+  console.log("  Admins:");
+  adminUsers.forEach((u) => console.log(`    ${u.email}`));
+  console.log("");
+  console.log("  Doctors:");
+  doctorUsers.forEach((u) => console.log(`    ${u.email}`));
+  console.log("");
+  console.log("  Patients:");
+  patientUsers.forEach((u) => console.log(`    ${u.email}`));
+  console.log("");
+  console.log("Coverage:");
+  console.log(`  5 departments | 3 admins | 10 doctors | 30 patients`);
+  console.log(`  ${apptRows.length} appointments (all 6 statuses)`);
+  console.log(`  ${mrRows.length} medical records`);
+  console.log(`  ${rxRows.length} prescriptions + ${rxItems.length} items`);
+  console.log(`  ${invoiceRows.length} invoices (all 4 statuses)`);
+  console.log(`  ${reviewRows.length} reviews (all 10 doctors)`);
+  console.log(`  ${notifRows.length} notifications`);
+  console.log("");
+  console.log("Idempotent: safe to re-run with pnpm db:seed");
 
   process.exit(0);
 }
