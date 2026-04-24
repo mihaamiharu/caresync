@@ -549,6 +549,231 @@ async function seed() {
   console.log("");
   console.log("Slice 3 complete. Moving to next slice...");
 
+  // ─── Medical Records + Prescriptions ────────────────────────────────────
+  // ~20 completed appointments get medical records
+  // ~15 of those also get prescriptions with items
+  // Rest have no prescription (self-limiting conditions)
+
+  const completedAppts = apptRows.filter((a) => a.status === "completed");
+  const mrCount = Math.min(22, completedAppts.length);
+  const selectedForMr = completedAppts.slice(0, mrCount);
+  const selectedForRx = selectedForMr.slice(0, 16);
+
+  const diagnosisMap: Record<string, { diagnosis: string; symptoms: string; notes: string | null }> = {
+    "Annual physical": { diagnosis: "Healthy adult, no significant findings", symptoms: "None", notes: "Preventive care counseling provided. Vaccinations up to date." },
+    "Persistent cough": { diagnosis: "Upper respiratory infection, likely viral", symptoms: "Dry cough for 2 weeks, no fever", notes: "Viral etiology suspected. Supportive care advised. Return if symptoms persist beyond 3 weeks." },
+    "Fatigue and low energy": { diagnosis: "Iron deficiency anemia", symptoms: "Easy fatigability, pallor, shortness of breath on exertion", notes: "Ferritin and CBC ordered. Dietary iron advice given." },
+    "Headaches": { diagnosis: "Tension-type headache", symptoms: "Bilateral pressing pain, no nausea or visual aura", notes: "Stress management and ergonomics advice. Ibuprofen PRN." },
+    "Skin rash": { diagnosis: "Contact dermatitis", symptoms: "Pruritic erythematous patch on forearm", notes: "Topical corticosteroid prescribed. Identified probable irritant." },
+    "Follow-up: blood pressure": { diagnosis: "Stage 1 hypertension", symptoms: "BP consistently 140/90 range", notes: "Lifestyle modifications discussed. Started on amlodipine 5mg daily." },
+    "Follow-up: diabetes management": { diagnosis: "Type 2 diabetes mellitus, HbA1c 7.8%", symptoms: "Polydipsia, polyuria, mild fatigue", notes: "Metformin adjusted. Blood glucose monitoring recommended." },
+    "Joint pain": { diagnosis: "Osteoarthritis, mild bilateral knee", symptoms: "Mechanical knee pain worse with activity, no swelling", notes: "Physiotherapy referral. Paracetamol PRN." },
+    "Abdominal pain": { diagnosis: "Gastritis", symptoms: "Epigastric burning pain after meals", notes: "PPI therapy for 4 weeks. H. pylori testing arranged." },
+    "Sleep difficulties": { diagnosis: "Insomnia, secondary", symptoms: "Difficulty initiating and maintaining sleep, daytime fatigue", notes: "Sleep hygiene counseling provided. Short-term zolpidem PRN." },
+    "Chest discomfort on exertion": { diagnosis: "Stable angina pectoris", symptoms: "Retrosternal chest pressure on exertion, relieved by rest", notes: "Stress ECG arranged. GTN spray prescribed." },
+    "Palpitations": { diagnosis: "Sinus tachycardia, anxiety-related", symptoms: "Intermittent awareness of heartbeat, no structural abnormality on ECG", notes: "Reassurance. Beta-blocker PRN for symptom control." },
+    "Family history of heart disease": { diagnosis: "Hyperlipidemia, primary prevention", symptoms: "LDL 4.2 mmol/L, strong family history", notes: "Statin therapy initiated. Dietary modifications advised." },
+    "Dizziness": { diagnosis: "Benign paroxysmal positional vertigo", symptoms: "Brief spinning vertigo with head movements", notes: "Epley maneuver demonstrated. Follow-up if recurrent." },
+    "Shortness of breath": { diagnosis: "Mild asthma, partially controlled", symptoms: "Intermittent wheeze and dyspnea, especially at night", notes: "Inhaler technique corrected. Step-up to combination inhaler." },
+    "Post-procedure follow-up": { diagnosis: "Post-cardiac catheterization, uncomplicated", symptoms: "No complaints, groin site clean", notes: "Discharge instructions reinforced. Dual antiplatelet continued." },
+    "Knee pain after running": { diagnosis: "Patellofemoral pain syndrome", symptoms: "Anterior knee pain worse with stairs and running", notes: "Quadriceps strengthening exercises prescribed. Ice PRN." },
+    "Ankle sprain": { diagnosis: "Grade II lateral ankle sprain", symptoms: "Swelling and bruising lateral ankle, weight-bearing painful", notes: "RICE protocol. Elastic bandage. Physiotherapy referral." },
+    "Lower back pain": { diagnosis: "Acute lumbar strain", symptoms: "Low back pain after lifting, no radiculopathy", notes: "保持活动, avoid bed rest. NSAIDs prescribed. Return if sciatica develops." },
+    "Shoulder stiffness": { diagnosis: "Adhesive capsulitis, early stage", symptoms: "Progressive loss of external rotation and abduction", notes: "Physiotherapy. Hydrocortisone injection if no improvement in 6 weeks." },
+    "Sports injury assessment": { diagnosis: "Mild medial collateral ligament strain", symptoms: "Knee valgus stress pain, no instability", notes: "Knee brace prescribed. Graduated return to sport protocol." },
+    "Post-fracture follow-up": { diagnosis: "Healing undisplaced radial fracture", symptoms: "Wrist pain resolving, range of motion improving", notes: "Physiotherapy exercises. X-ray at 6 weeks confirmed union." },
+    "Ear infection": { diagnosis: "Acute otitis media, right ear", symptoms: "Ear pain, fever 38.5°C, red bulging tympanum", notes: "Amoxicillin prescribed. Review in 2 weeks." },
+    "Fever and fussiness": { diagnosis: "Viral exanthem, likely roseola", symptoms: "High fever 3 days followed by maculopapular rash", notes: "Supportive care. Antipyretics for comfort. Return if fever recurs." },
+    "Vaccination schedule": { diagnosis: "Routine immunization visit, up to date", symptoms: "No acute concerns", notes: "Vaccines administered per schedule. Post-vaccination monitoring 15 minutes." },
+    "Growth check": { diagnosis: "Normal growth and development, 50th percentile", symptoms: "No concerns", notes: "Parental reassurance. Next review at 2 years." },
+    "Behavioral concerns": { diagnosis: "Attention deficit hyperactivity disorder, suspected", symptoms: "Inattention and hyperactivity reported by school", notes: "Conners rating scale arranged. Pediatrician referral for full assessment." },
+    "Moles consultation": { diagnosis: "Benign melanocytic nevi, no dysplastic features", symptoms: "Patient concerned about pigmented lesion on back", notes: "Dermoscopy performed. No excision needed. Annual skin check advised." },
+    "Acne treatment": { diagnosis: "Acne vulgaris, moderate comedonal-pustular", symptoms: "Facial papules and pustules, scarring beginning", notes: "Topical retinoid + benzoyl peroxide combination prescribed." },
+    "Eczema flare-up": { diagnosis: "Atopic dermatitis, moderate flare", symptoms: "Intensely pruritic eczematous plaques in antecubital fossae", notes: "Topical corticosteroid stepped up. Emollient use reinforced." },
+    "Psoriasis management": { diagnosis: "Psoriasis vulgaris, plaque type, moderate", symptoms: "Well-demarcated erythematous plaques on elbows and knees", notes: "Vitamin D analogue prescribed. Phototherapy referral arranged." },
+    "Skin biopsy follow-up": { diagnosis: "Basal cell carcinoma, post-excision", symptoms: "Healing surgical site, no recurrence signs", symptoms: "", notes: "Sutures removed. Wound care instructions given. Annual skin surveillance." },
+    "Cosmetic procedure consultation": { diagnosis: "Patient seeking botulinum toxin for facial lines", symptoms: "Dynamic glabellar and forehead lines", notes: "Procedure explained. Consent obtained. Treatment arranged." },
+  };
+
+  const rxProfiles: Array<{
+    apptId: string;
+    patientId: string;
+    doctorId: string;
+    diagnosis: string;
+    notes: string | null;
+    items: Array<{ name: string; dosage: string; frequency: string; duration: string; instructions: string | null }>;
+  }> = [
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Stage 1 hypertension",
+      notes: "Monitor BP twice daily. Low-sodium diet advised.",
+      items: [
+        { name: "Amlodipine", dosage: "5mg", frequency: "Once daily", duration: "90 days", instructions: "Take in the morning" },
+        { name: "Lisinopril", dosage: "10mg", frequency: "Once daily", duration: "90 days", instructions: "Take at the same time each day" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Type 2 diabetes mellitus, HbA1c 7.8%",
+      notes: "Monitor blood glucose daily. HbA1c in 3 months.",
+      items: [
+        { name: "Metformin", dosage: "500mg", frequency: "Twice daily with meals", duration: "90 days", instructions: "Start once daily first week to reduce GI side effects" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Upper respiratory infection, likely viral",
+      notes: "Supportive care. Return if symptoms worsen.",
+      items: [
+        { name: "Paracetamol", dosage: "500mg", frequency: "Every 6 hours PRN", duration: "5 days", instructions: "Take with food" },
+        { name: "Saline nasal spray", dosage: "As needed", frequency: "Nasal", duration: "5 days", instructions: null },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Iron deficiency anemia",
+      notes: "Take iron supplement on empty stomach with vitamin C.",
+      items: [
+        { name: "Ferrous sulfate", dosage: "200mg", frequency: "Three times daily", duration: "90 days", instructions: "30 minutes before meals" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Stable angina pectoris",
+      notes: "GTN for acute episodes. Call emergency if pain persists >10 min.",
+      items: [
+        { name: "Nitroglycerin", dosage: "0.5mg sublingual", frequency: "PRN for chest pain", duration: "PRN", instructions: "Sit when taking" },
+        { name: "Aspirin", dosage: "75mg", frequency: "Once daily", duration: "Ongoing", instructions: "Take with food" },
+        { name: "Atorvastatin", dosage: "40mg", frequency: "Once at night", duration: "90 days", instructions: "Avoid grapefruit juice" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Grade II lateral ankle sprain",
+      notes: "RICE protocol first 48 hours. Gradual weight-bearing as tolerated.",
+      items: [
+        { name: "Ibuprofen", dosage: "400mg", frequency: "Three times daily with food", duration: "7 days", instructions: "Take with food" },
+        { name: "Elastic bandage", dosage: "As directed", frequency: "During activity", duration: "14 days", instructions: null },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Acute otitis media, right ear",
+      notes: "Complete full course of antibiotics.",
+      items: [
+        { name: "Amoxicillin", dosage: "250mg", frequency: "Three times daily", duration: "7 days", instructions: "Complete the course even if feeling better" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Acne vulgaris, moderate comedonal-pustular",
+      notes: "Apply medications to clean dry skin. Avoid picking.",
+      items: [
+        { name: "Adapalene 0.1%", dosage: "Topical", frequency: "Once at night", duration: "90 days", instructions: "Start 3x/week, increase to daily as tolerated" },
+        { name: "Benzoyl peroxide 5%", dosage: "Topical", frequency: "Once in the morning", duration: "90 days", instructions: "May bleach clothing" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Atopic dermatitis, moderate flare",
+      notes: "Emollient use at least twice daily. Identify and avoid triggers.",
+      items: [
+        { name: "Hydrocortisone butyrate 0.1%", dosage: "Topical", frequency: "Twice daily", duration: "14 days", instructions: "Apply thinly to affected areas" },
+        { name: "Emollient cream", dosage: "Topical", frequency: "At least twice daily", duration: "Ongoing", instructions: "Use liberally and frequently" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Mild asthma, partially controlled",
+      notes: "Check inhaler technique. Review in 4 weeks.",
+      items: [
+        { name: "Salbutamol inhaler", dosage: "100mcg", frequency: "PRN for symptoms", duration: "PRN", instructions: "2 puffs via spacer" },
+        { name: "Fluticasone/Salmeterol", dosage: "250/50mcg", frequency: "Twice daily", duration: "90 days", instructions: "Rinse mouth after use" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Patellofemoral pain syndrome",
+      notes: "Quad strengthening exercises 2x daily. Avoid aggravating activities.",
+      items: [
+        { name: "Paracetamol", dosage: "500mg", frequency: "Every 6 hours PRN", duration: "14 days", instructions: null },
+        { name: "Knee brace", dosage: "As directed", frequency: "During sports", duration: "30 days", instructions: null },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Acute lumbar strain",
+      notes: "Stay active. Avoid heavy lifting for 4 weeks.",
+      items: [
+        { name: "Diclofenac", dosage: "50mg", frequency: "Twice daily", duration: "7 days", instructions: "Take with food" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Tension-type headache",
+      notes: "Stress management and ergonomic adjustments. Return if frequency increases.",
+      items: [
+        { name: "Paracetamol", dosage: "500mg", frequency: "Every 6 hours PRN", duration: "30 days", instructions: null },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Psoriasis vulgaris, plaque type, moderate",
+      notes: "Phototherapy 3x/week. Topicals as adjunct.",
+      items: [
+        { name: "Calcipotriol 0.005% ointment", dosage: "Topical", frequency: "Twice daily", duration: "90 days", instructions: "Apply to plaques" },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Hyperlipidemia, primary prevention",
+      notes: "Low-fat diet. Exercise 150 min/week. Repeat lipid panel in 3 months.",
+      items: [
+        { name: "Atorvastatin", dosage: "20mg", frequency: "Once at night", duration: "90 days", instructions: null },
+      ],
+    },
+    {
+      apptId: "", patientId: "", doctorId: "", diagnosis: "Insomnia, secondary",
+      notes: "Sleep hygiene reinforcement. Short-term pharmacotherapy.",
+      items: [
+        { name: "Zolpidem", dosage: "10mg", frequency: "Once at bedtime PRN", duration: "14 days", instructions: "Take just before sleep" },
+      ],
+    },
+  ];
+
+  // Insert medical records
+  const mrRows = await db
+    .insert(medicalRecords)
+    .values(
+      selectedForMr.map((a) => {
+        const diag = diagnosisMap[a.reason] ?? { diagnosis: "General consultation", symptoms: "As per history", notes: null };
+        return {
+          appointmentId: a.id,
+          patientId: a.patientId,
+          doctorId: a.doctorId,
+          diagnosis: diag.diagnosis,
+          symptoms: diag.symptoms,
+          notes: diag.notes,
+        };
+      })
+    )
+    .returning();
+  console.log(`  ✓ ${mrRows.length} medical records created`);
+
+  // Insert prescriptions + prescription items for selected subset
+  const mrByApptId = new Map(mrRows.map((mr) => [mr.appointmentId, mr]));
+  const rxRows = await db
+    .insert(prescriptions)
+    .values(
+      selectedForRx.map((_, i) => ({
+        medicalRecordId: mrByApptId.get(selectedForRx[i].id)!.id,
+        notes: rxProfiles[i].notes,
+      }))
+    )
+    .returning();
+
+  const rxItems = rxRows.flatMap((rx, i) =>
+    rxProfiles[i].items.map((item) => ({
+      prescriptionId: rx.id,
+      medicationName: item.name,
+      dosage: item.dosage,
+      frequency: item.frequency,
+      duration: item.duration,
+      instructions: item.instructions,
+    }))
+  );
+  await db.insert(prescriptionItems).values(rxItems);
+  console.log(`  ✓ ${rxRows.length} prescriptions with items created`);
+  console.log(`  ✓ ${rxItems.length} prescription items created`);
+
+  console.log("");
+  console.log("Slice 4 complete. Moving to next slice...");
+
   process.exit(0);
 }
 
