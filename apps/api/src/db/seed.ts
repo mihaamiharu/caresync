@@ -572,7 +572,7 @@ async function seed() {
     "Acne treatment": { diagnosis: "Acne vulgaris, moderate comedonal-pustular", symptoms: "Facial papules and pustules, scarring beginning", notes: "Topical retinoid + benzoyl peroxide combination prescribed." },
     "Eczema flare-up": { diagnosis: "Atopic dermatitis, moderate flare", symptoms: "Intensely pruritic eczematous plaques in antecubital fossae", notes: "Topical corticosteroid stepped up. Emollient use reinforced." },
     "Psoriasis management": { diagnosis: "Psoriasis vulgaris, plaque type, moderate", symptoms: "Well-demarcated erythematous plaques on elbows and knees", notes: "Vitamin D analogue prescribed. Phototherapy referral arranged." },
-    "Skin biopsy follow-up": { diagnosis: "Basal cell carcinoma, post-excision", symptoms: "Healing surgical site, no recurrence signs", symptoms: "", notes: "Sutures removed. Wound care instructions given. Annual skin surveillance." },
+    "Skin biopsy follow-up": { diagnosis: "Basal cell carcinoma, post-excision", symptoms: "Healing surgical site, no recurrence signs", notes: "Sutures removed. Wound care instructions given. Annual skin surveillance." },
     "Cosmetic procedure consultation": { diagnosis: "Patient seeking botulinum toxin for facial lines", symptoms: "Dynamic glabellar and forehead lines", notes: "Procedure explained. Consent obtained. Treatment arranged." },
   };
 
@@ -712,7 +712,7 @@ async function seed() {
     .insert(medicalRecords)
     .values(
       selectedForMr.map((a) => {
-        const diag = diagnosisMap[a.reason] ?? { diagnosis: "General consultation", symptoms: "As per history", notes: null };
+        const diag = diagnosisMap[a.reason ?? ""] ?? { diagnosis: "General consultation", symptoms: "As per history", notes: null };
         return {
           appointmentId: a.id,
           patientId: a.patientId,
