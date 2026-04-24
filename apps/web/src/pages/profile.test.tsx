@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { toast } from "sonner";
 import { ProfilePage } from "./profile";
 import { useAuthStore } from "@/stores/auth-store";
 import type { User, Patient } from "@caresync/shared";
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 // Mock react-router to supply loader data without a data router
 vi.mock("react-router", async (importOriginal) => {
@@ -146,7 +149,9 @@ describe("ProfilePage", () => {
 
     await userEvent.click(screen.getByTestId("save-profile-button"));
 
-    expect(await screen.findByTestId("profile-success")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith("Profile updated successfully");
+    });
   });
 
   it("shows an error message when the API call fails", async () => {
@@ -159,7 +164,9 @@ describe("ProfilePage", () => {
 
     await userEvent.click(screen.getByTestId("save-profile-button"));
 
-    expect(await screen.findByTestId("profile-error")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Failed to update profile");
+    });
   });
 
   it("disables the save button while submitting", async () => {
@@ -253,7 +260,11 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
 
     await userEvent.click(screen.getByTestId("save-medical-button"));
 
-    expect(await screen.findByTestId("medical-success")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        "Medical information updated successfully"
+      );
+    });
   });
 
   it("shows error message when medical save fails", async () => {
@@ -266,6 +277,8 @@ describe("ProfilePage — Medical Information section (patient role)", () => {
 
     await userEvent.click(screen.getByTestId("save-medical-button"));
 
-    expect(await screen.findByTestId("medical-error")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Validation error");
+    });
   });
 });

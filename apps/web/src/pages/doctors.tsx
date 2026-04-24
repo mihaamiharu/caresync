@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import { doctorsApi, departmentsApi, type CreateDoctorInput, type ApiError } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Doctor, Department } from "@caresync/shared";
@@ -57,7 +58,6 @@ function DoctorFormModal({
   onSaved,
 }: DoctorFormModalProps) {
   const isEditing = !!doctor;
-  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
@@ -79,10 +79,8 @@ function DoctorFormModal({
   });
 
   const onSubmit = async (data: DoctorFormInput) => {
-    setServerError(null);
     try {
       if (isEditing && doctor) {
-        // For editing, we don't send email/password/licenseNumber as per our API (currently)
         await doctorsApi.updateDoctor(doctor.id, {
           firstName: data.firstName,
           lastName: data.lastName,
@@ -91,17 +89,18 @@ function DoctorFormModal({
           specialization: data.specialization,
           bio: data.bio || null,
         });
+        toast.success("Doctor updated successfully");
       } else {
         if (!data.email) {
-          setServerError("Email is required for new doctors");
+          toast.error("Email is required for new doctors");
           return;
         }
         if (!data.password) {
-          setServerError("Password is required for new doctors");
+          toast.error("Password is required for new doctors");
           return;
         }
         if (!data.licenseNumber) {
-          setServerError("License number is required for new doctors");
+          toast.error("License number is required for new doctors");
           return;
         }
         await doctorsApi.createDoctor({
@@ -112,6 +111,7 @@ function DoctorFormModal({
           phone: data.phone || null,
           bio: data.bio || null,
         } as CreateDoctorInput);
+        toast.success("Doctor created successfully");
       }
       onSaved();
       onClose();
@@ -119,24 +119,22 @@ function DoctorFormModal({
       const axiosError = err as ApiError;
       const data = axiosError.response?.data;
       if (data?.message) {
-        setServerError(data.message);
+        toast.error(data.message);
       } else if (data?.error?.issues) {
-        // Flatten Hono/Zod-OpenAPI issues
         const errorMsgs = data.error.issues
           .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
           .join(" | ");
-        setServerError(errorMsgs || "Validation failed");
+        toast.error(errorMsgs || "Validation failed");
       } else if (data?.errors) {
-        // Flatten other potential error structures
         const errorMsgs = Object.entries(data.errors)
           .map(
             ([field, error]) =>
               `${field}: ${typeof error === 'string' ? error : error._errors?.join(", ") || "Invalid field"}`
           )
           .join(" | ");
-        setServerError(errorMsgs || "Validation failed");
+        toast.error(errorMsgs || "Validation failed");
       } else {
-        setServerError("Something went wrong. Please try again.");
+        toast.error("Something went wrong. Please try again.");
       }
     }
   };
@@ -156,16 +154,6 @@ function DoctorFormModal({
           noValidate
           className="space-y-4"
         >
-          {serverError && (
-            <p
-              role="alert"
-              data-testid="doctor-form-error"
-              className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-            >
-              {serverError}
-            </p>
-          )}
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label htmlFor="doc-firstName" className="text-sm font-medium">
@@ -477,9 +465,10 @@ export function DoctorsPage() {
     }
     try {
       await doctorsApi.deleteDoctor(id);
+      toast.success("Doctor deleted successfully");
       revalidator.revalidate();
     } catch {
-      alert("Failed to delete doctor.");
+      toast.error("Failed to delete doctor");
     }
   };
 

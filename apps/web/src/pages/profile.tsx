@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import { usersApi, patientsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { BLOOD_TYPES, GENDERS } from "@caresync/shared";
@@ -37,9 +38,6 @@ const medicalSchema = z.object({
 type MedicalInput = z.infer<typeof medicalSchema>;
 
 function MedicalInfoForm({ patient }: { patient: Patient | null }) {
-  const [success, setSuccess] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
-
   const {
     register,
     handleSubmit,
@@ -57,8 +55,6 @@ function MedicalInfoForm({ patient }: { patient: Patient | null }) {
   });
 
   const onSubmit = async (data: MedicalInput) => {
-    setSuccess(false);
-    setServerError(null);
     try {
       await patientsApi.upsertPatient({
         dateOfBirth: data.dateOfBirth || null,
@@ -68,11 +64,11 @@ function MedicalInfoForm({ patient }: { patient: Patient | null }) {
         emergencyContactName: data.emergencyContactName || null,
         emergencyContactPhone: data.emergencyContactPhone || null,
       });
-      setSuccess(true);
+      toast.success("Medical information updated successfully");
     } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
-      setServerError(msg ?? "Something went wrong. Please try again.");
+      toast.error(msg ?? "Something went wrong. Please try again.");
     }
   };
 
@@ -86,24 +82,6 @@ function MedicalInfoForm({ patient }: { patient: Patient | null }) {
       </h2>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        {serverError && (
-          <p
-            role="alert"
-            data-testid="medical-error"
-            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          >
-            {serverError}
-          </p>
-        )}
-        {success && (
-          <p
-            data-testid="medical-success"
-            className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700"
-          >
-            Medical information updated successfully.
-          </p>
-        )}
-
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label htmlFor="dateOfBirth" className="text-sm font-medium">
@@ -223,8 +201,6 @@ export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const setAuth = useAuthStore((s) => s.setAuth);
   const accessToken = useAuthStore((s) => s.accessToken);
-  const [success, setSuccess] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -242,8 +218,6 @@ export function ProfilePage() {
   });
 
   const onSubmit = async (data: ProfileInput) => {
-    setSuccess(false);
-    setServerError(null);
     try {
       const updated = await usersApi.updateProfile({
         firstName: data.firstName,
@@ -253,11 +227,11 @@ export function ProfilePage() {
       if (updated && accessToken) {
         setAuth(updated, accessToken);
       }
-      setSuccess(true);
+      toast.success("Profile updated successfully");
     } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
-      setServerError(msg ?? "Something went wrong. Please try again.");
+      toast.error(msg ?? "Something went wrong. Please try again.");
     }
   };
 
@@ -272,10 +246,11 @@ export function ProfilePage() {
       if (updated && accessToken) {
         setAuth(updated, accessToken);
       }
+      toast.success("Avatar updated successfully");
     } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
-      setAvatarError(msg ?? "Failed to upload avatar.");
+      toast.error(msg ?? "Failed to upload avatar.");
     }
   };
 
@@ -362,24 +337,6 @@ export function ProfilePage() {
             noValidate
             className="space-y-4"
           >
-            {serverError && (
-              <p
-                role="alert"
-                data-testid="profile-error"
-                className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-              >
-                {serverError}
-              </p>
-            )}
-            {success && (
-              <p
-                data-testid="profile-success"
-                className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700"
-              >
-                Profile updated successfully.
-              </p>
-            )}
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label htmlFor="firstName" className="text-sm font-medium">

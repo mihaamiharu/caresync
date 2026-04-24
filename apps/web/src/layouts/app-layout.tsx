@@ -1,6 +1,8 @@
 import { Outlet } from "react-router";
+import { Toaster } from "sonner";
 import { Sidebar } from "@/components/sidebar";
 import { NotificationBell } from "@/components/notification-bell";
+import { OnlineStatusBanner } from "@/components/ui/online-status-banner";
 
 export function AppLayout() {
   return (
@@ -14,9 +16,11 @@ export function AppLayout() {
           className="flex-1 overflow-y-auto bg-background p-6"
           data-testid="main-content"
         >
+          <OnlineStatusBanner />
           <Outlet />
         </main>
       </div>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }

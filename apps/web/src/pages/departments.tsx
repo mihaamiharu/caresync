@@ -3,6 +3,7 @@ import { useLoaderData, useNavigation, useRevalidator } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import { departmentsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Department } from "@caresync/shared";
@@ -38,7 +39,6 @@ function DepartmentFormModal({
   onSaved,
 }: DepartmentFormModalProps) {
   const isEditing = !!dept;
-  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
@@ -54,7 +54,6 @@ function DepartmentFormModal({
   });
 
   const onSubmit = async (data: DepartmentFormInput) => {
-    setServerError(null);
     const payload = {
       name: data.name,
       description: data.description || null,
@@ -63,15 +62,17 @@ function DepartmentFormModal({
     try {
       if (isEditing && dept) {
         await departmentsApi.updateDepartment(dept.id, payload);
+        toast.success("Department updated successfully");
       } else {
         await departmentsApi.createDepartment(payload);
+        toast.success("Department created successfully");
       }
       onSaved();
       onClose();
     } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
-      setServerError(msg ?? "Something went wrong. Please try again.");
+      toast.error(msg ?? "Something went wrong. Please try again.");
     }
   };
 
@@ -90,16 +91,6 @@ function DepartmentFormModal({
           noValidate
           className="space-y-4"
         >
-          {serverError && (
-            <p
-              role="alert"
-              data-testid="dept-form-error"
-              className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-            >
-              {serverError}
-            </p>
-          )}
-
           <div className="space-y-1">
             <label htmlFor="dept-name" className="text-sm font-medium">
               Name <span className="text-destructive">*</span>
@@ -280,9 +271,10 @@ export function DepartmentsPage() {
   const handleDelete = async (id: string) => {
     try {
       await departmentsApi.deleteDepartment(id);
+      toast.success("Department deleted");
       revalidator.revalidate();
     } catch {
-      // Delete error is silent — a real app would show a toast
+      toast.error("Failed to delete department");
     }
   };
 

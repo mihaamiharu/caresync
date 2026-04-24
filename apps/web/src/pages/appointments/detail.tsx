@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import { toast } from "sonner";
 import {
   appointmentsApi,
   medicalRecordsApi,
@@ -15,7 +16,8 @@ import type {
   Review,
   User,
   Patient,
-  Doctor,} from "@caresync/shared";
+  Doctor,
+} from "@caresync/shared";
 import { StatusBadge } from "./components/StatusBadge";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -145,11 +147,13 @@ function MedicalRecordSection({
         notes: notes || null,
       });
       setRecord(created);
+      toast.success("Medical record created successfully");
     } catch (err) {
       const msg =
         (err as ApiError)?.response?.data?.message ??
         "Failed to create medical record.";
       setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -334,7 +338,7 @@ function ReviewSection({
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0 || comment.length > 500) return;
     setSubmitting(true);
@@ -346,10 +350,13 @@ function ReviewSection({
         comment: comment.trim() || null,
       });
       setDone(true);
+      toast.success("Review submitted successfully");
     } catch (err) {
       const msg =
         (err as ApiError)?.response?.data?.message ??
-        "Failed to submit review.";      setError(msg);
+        "Failed to submit review.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -462,11 +469,14 @@ export function AppointmentDetailPage() {
     try {
       const res = await appointmentsApi.updateStatus(id, targetStatus);
       setAppointment(res.appointment);
+      const statusLabel = targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1);
+      toast.success(`Appointment ${statusLabel.toLowerCase() === "cancelled" ? "cancelled" : "updated"} successfully`);
     } catch (err) {
       const msg =
         (err as ApiError)?.response?.data?.message ??
         "Failed to update appointment status.";
       setActionError(msg);
+      toast.error(msg);
     } finally {
       setUpdating(false);
     }
