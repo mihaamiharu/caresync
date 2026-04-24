@@ -170,6 +170,7 @@ function DepartmentFormModal({
             </button>
             <button
               type="submit"
+              data-testid="dept-form-submit"
               disabled={isSubmitting}
               className="rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all shadow-md shadow-primary/20"
             >
