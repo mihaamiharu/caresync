@@ -51,6 +51,7 @@ import {
   DoctorDashboardPage,
   doctorDashboardLoader,
 } from "@/pages/doctor-dashboard";
+import { TestCasesPage } from "@/pages/docs";
 
 function getRoleDashboard(role: string): string {
   switch (role) {
@@ -152,6 +153,10 @@ export const router = createBrowserRouter([
                 <AdminDashboardPage />
               </RoleOnlyRoute>
             ),
+          },
+          {
+            path: "/docs",
+            element: <TestCasesPage />,
           },
           {
             path: "/appointments",
