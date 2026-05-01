@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { Sidebar } from "@/components/sidebar";
 import { TEST_CASES, TestCase } from "./test-cases-data";
 import { 
   Search, 
@@ -43,11 +42,8 @@ export function TestCasesPage() {
   const automatedPercentage = Math.round((automatedTests / totalTests) * 100);
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      <Sidebar />
-      
-      <main className="flex-1 flex flex-col h-full overflow-hidden border-l border-border/40">
-        {/* Header / Topbar */}
+    <div className="flex flex-col h-[calc(100vh-8rem)] min-h-[600px] bg-background border border-border/40 shadow-sm rounded-xl overflow-hidden">
+      {/* Header / Topbar */}
         <header className="h-16 border-b border-border/40 bg-card/30 backdrop-blur-md flex items-center px-6 justify-between shrink-0">
           <div className="flex items-center gap-4">
             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -237,7 +233,6 @@ export function TestCasesPage() {
             </aside>
           )}
         </div>
-      </main>
     </div>
   );
 }
