@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { TEST_CASES, TestCase } from "./test-cases-data";
+import { USER_FLOWS } from "./user-flows-data";
 import { 
   Search, 
   Folder, 
@@ -9,10 +10,14 @@ import {
   FileText,
   Activity,
   Shield,
-  Clock
+  Clock,
+  LayoutList,
+  GitMerge,
+  ArrowRight
 } from "lucide-react";
 
 export function TestCasesPage() {
+  const [activeTab, setActiveTab] = useState<"test-cases" | "user-flows">("test-cases");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTest, setSelectedTest] = useState<TestCase | null>(null);
@@ -50,9 +55,30 @@ export function TestCasesPage() {
               <Shield className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold leading-none">Test Case Management</h1>
-              <p className="text-xs text-muted-foreground mt-1">End-to-end testing scenarios</p>
+              <h1 className="text-lg font-semibold leading-none">Documentation</h1>
+              <p className="text-xs text-muted-foreground mt-1">Platform guides and testing</p>
             </div>
+          </div>
+          
+          <div className="flex bg-muted/50 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab("test-cases")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                activeTab === "test-cases" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <LayoutList className="w-4 h-4" />
+              Test Cases
+            </button>
+            <button
+              onClick={() => setActiveTab("user-flows")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                activeTab === "user-flows" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <GitMerge className="w-4 h-4" />
+              User Flows
+            </button>
           </div>
           
           <div className="flex items-center gap-6 text-sm">
@@ -73,6 +99,8 @@ export function TestCasesPage() {
 
         {/* Content Area */}
         <div className="flex-1 flex overflow-hidden">
+          {activeTab === "test-cases" ? (
+            <>
           
           {/* Left Panel: Categories Tree */}
           <aside className="w-64 border-r border-border/40 bg-card/10 flex flex-col shrink-0">
@@ -232,7 +260,113 @@ export function TestCasesPage() {
               </div>
             </aside>
           )}
+          </>
+          ) : (
+            <UserFlowsView />
+          )}
         </div>
+    </div>
+  );
+}
+
+function UserFlowsView() {
+  const [selectedFlow, setSelectedFlow] = useState(USER_FLOWS[0]);
+
+  return (
+    <div className="flex-1 flex overflow-hidden bg-background">
+      {/* Left Panel: Flows List */}
+      <aside className="w-80 border-r border-border/40 bg-card/10 flex flex-col shrink-0">
+        <div className="p-4 border-b border-border/40">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Core Journeys</h2>
+          <div className="space-y-2">
+            {USER_FLOWS.map((flow) => {
+              const Icon = flow.icon;
+              const isSelected = selectedFlow.id === flow.id;
+              return (
+                <button
+                  key={flow.id}
+                  onClick={() => setSelectedFlow(flow)}
+                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    isSelected 
+                      ? "bg-primary/5 border-primary/20 shadow-sm" 
+                      : "bg-background border-transparent hover:border-border/50 hover:bg-muted/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className={`p-1.5 rounded-md ${isSelected ? "bg-primary/10" : "bg-muted"}`}>
+                      <Icon className={`w-4 h-4 ${isSelected ? flow.color : "text-muted-foreground"}`} />
+                    </div>
+                    <span className={`font-semibold text-sm ${isSelected ? "text-foreground" : "text-muted-foreground"}`}>
+                      {flow.title}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2 pl-10">
+                    {flow.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </aside>
+
+      {/* Right Panel: Flow Details */}
+      <section className="flex-1 overflow-auto p-8">
+        <div className="max-w-3xl mx-auto">
+          <div className="mb-10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                <selectedFlow.icon className={`w-6 h-6 ${selectedFlow.color}`} />
+              </div>
+              <h2 className="text-3xl font-bold tracking-tight">{selectedFlow.title}</h2>
+            </div>
+            <p className="text-lg text-muted-foreground">{selectedFlow.description}</p>
+          </div>
+
+          <div className="relative">
+            {/* Vertical timeline line */}
+            <div className="absolute left-[27px] top-4 bottom-8 w-px bg-border/60" />
+
+            <div className="space-y-8 relative">
+              {selectedFlow.steps.map((step, index) => (
+                <div key={step.id} className="flex gap-6 relative group">
+                  {/* Step Number Circle */}
+                  <div className="flex-shrink-0 w-14 h-14 rounded-full bg-background border-2 border-primary/20 flex items-center justify-center text-primary font-bold shadow-sm z-10 relative group-hover:border-primary/50 transition-colors">
+                    {index + 1}
+                  </div>
+                  
+                  {/* Step Content */}
+                  <div className="flex-1 bg-card/30 border border-border/40 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-lg font-semibold text-foreground">{step.title}</h3>
+                      <span className="text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {step.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {step.description}
+                    </p>
+                    
+                    {step.testCases && step.testCases.length > 0 && (
+                      <div className="flex items-center gap-2 pt-3 border-t border-border/40">
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Covered by:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {step.testCases.map(tcId => (
+                            <span key={tcId} className="text-xs font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                              {tcId}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
